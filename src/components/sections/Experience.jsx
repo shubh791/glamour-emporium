@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { ArrowUpRight, CalendarDays } from "lucide-react";
-import { buildWhatsAppUrl } from "@/data/siteData";
+import { useBooking } from "@/context/BookingContext";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 /**
@@ -71,12 +71,12 @@ const experienceSteps = [
     stepNumber: "01",
     label: "01 / CONSULT",
     title: "CONSULT",
-    subtitle: "The Dialogue",
+    subtitle: "Your Vision",
     description:
-      "We begin by understanding the look, style and direction you want. A thoughtful consultation ensures every detail aligns with your lifestyle and preference.",
+      "Tell us the look, service or concern you have in mind. A friendly consultation ensures every detail matches your preferences and lifestyle.",
     image: {
       src: "/images/experience/consultation.webp",
-      alt: "Stylist and client discussing personalized haircut and styling during consultation",
+      alt: "Stylist and client discussing personalized haircut and styling at Glamour Emporium in Panipat",
       position: "50% 35%",
       label: "01 / CONSULTATION",
     },
@@ -90,10 +90,10 @@ const experienceSteps = [
     title: "CREATE",
     subtitle: "The Craft",
     description:
-      "Your service is shaped around your chosen style and grooming needs. Precise cuts, tailored techniques, and dedicated attention bring the vision to life.",
+      "Our team works with your preferences to create a look suited to you using quality hair and skin products with dedicated attention.",
     image: {
       src: "/images/salon-detail.jpg",
-      alt: "Stylist precision scissors work and styling craft in action",
+      alt: "Professional hairstylist cutting and styling hair at Glamour Emporium in Panipat",
       position: "50% 50%",
       label: "02 / CREATION",
     },
@@ -107,10 +107,10 @@ const experienceSteps = [
     title: "REFINE",
     subtitle: "The Precision",
     description:
-      "Details are adjusted carefully to create a balanced final look. Texture, weight, perimeter lines, and grooming accents are perfected with deliberate care.",
+      "Every cut, edge and contour is refined for clean lines and natural balance so your styling looks effortless from every angle.",
     image: {
       src: "/images/experience/refine-detail.webp",
-      alt: "Stylist refining hair texture and finish with comb detail",
+      alt: "Stylist refining hair texture and finish at Glamour Emporium in Panipat",
       position: "50% 30%",
       label: "03 / REFINEMENT",
     },
@@ -120,14 +120,14 @@ const experienceSteps = [
   {
     id: "04",
     stepNumber: "04",
-    label: "04 / FINISH",
-    title: "FINISH",
-    subtitle: "The Reveal",
+    label: "04 / KEEP",
+    title: "KEEP",
+    subtitle: "Daily Maintenance",
     description:
-      "The experience ends with finishing touches and styling guidance. You leave with effortless confidence and personalized advice to maintain your look.",
+      "Get simple guidance to help maintain your look after your visit, with advice on home styling and care tailored to your hair or skin.",
     image: {
       src: "/images/editorial-woman.jpg",
-      alt: "Polished final hairstyle portrait and confident reveal",
+      alt: "Client with finished salon haircut and styling at Glamour Emporium in Panipat",
       position: "50% 30%",
       label: "04 / FINISHING",
     },
@@ -139,6 +139,7 @@ const experienceSteps = [
 const AUTOPLAY_INTERVAL = 3000; // 3.0 seconds per ritual step
 
 export default function Experience() {
+  const { openBooking } = useBooking();
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isInView, setIsInView] = useState(false);
   const containerRef = useRef(null);
@@ -237,7 +238,7 @@ export default function Experience() {
           </div>
 
           <p className="max-w-md text-sm text-[#eae6df]/75 font-sans leading-relaxed pb-1 text-right">
-            Personal attention, considered styling and a refined experience from consultation to finishing touch.
+            A relaxed salon experience on Jattal Road, Panipat. Personal attention, considered styling and care for men and women.
           </p>
         </div>
 
@@ -383,17 +384,16 @@ export default function Experience() {
                   </p>
 
                   <div className="pt-3">
-                    <a
-                      href={buildWhatsAppUrl(step.whatsappMessage)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-[#f5f2eb] text-[#0c0b0a] hover:bg-[#c9a87c] text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-300 min-h-[44px]"
+                    <button
+                      type="button"
+                      onClick={() => openBooking()}
+                      className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-[#f5f2eb] text-[#0c0b0a] hover:bg-[#c9a87c] text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-300 min-h-[44px] cursor-pointer"
                       style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
                     >
                       <CalendarDays className="w-3.5 h-3.5 text-[#0c0b0a]/80" />
-                      <span>TALK TO A STYLIST</span>
+                      <span>BOOK A SLOT</span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
-                    </a>
+                    </button>
                   </div>
                 </div>
               );
@@ -423,7 +423,7 @@ export default function Experience() {
             THE GLAMOUR <span className="italic text-[#c9a87c]">RITUAL.</span>
           </h2>
           <p className="text-sm text-[#eae6df]/80 font-sans leading-relaxed mt-1">
-            Personal attention, considered styling and a refined experience from consultation to finishing touch.
+            A relaxed salon experience on Jattal Road, Panipat. Personal attention, considered styling and care for men and women.
           </p>
         </div>
 
@@ -526,19 +526,18 @@ export default function Experience() {
           </p>
 
           <div className="pt-2">
-            <a
-              href={buildWhatsAppUrl(activeStep.whatsappMessage)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-between w-full p-4 bg-[#f5f2eb] text-[#0c0b0a] font-bold text-xs tracking-[0.18em] uppercase hover:bg-[#c9a87c] transition-colors min-h-[48px] shadow-[0_4px_20px_rgba(245,242,235,0.12)]"
+            <button
+              type="button"
+              onClick={() => openBooking()}
+              className="inline-flex items-center justify-between w-full p-4 bg-[#f5f2eb] text-[#0c0b0a] font-bold text-xs tracking-[0.18em] uppercase hover:bg-[#c9a87c] transition-colors min-h-[48px] shadow-[0_4px_20px_rgba(245,242,235,0.12)] cursor-pointer"
               style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
             >
               <span className="flex items-center gap-2">
                 <CalendarDays className="w-4 h-4 text-[#0c0b0a]/80" />
-                <span>BOOK THIS RITUAL</span>
+                <span>BOOK A SLOT</span>
               </span>
               <ArrowUpRight className="w-4 h-4" />
-            </a>
+            </button>
           </div>
         </div>
 

@@ -6,14 +6,15 @@
  */
 
 const WHATSAPP_PHONE_RAW = "917495068282";
-const DEFAULT_BOOKING_MESSAGE = "Hi Glamour Emporium, I would like to book a slot.";
+export const DEFAULT_HELP_MESSAGE = "Hello Glamour Emporium,\n\nI have a question and need some help before booking my appointment.\n\nThank you.";
+export const DEFAULT_BOOKING_MESSAGE = DEFAULT_HELP_MESSAGE;
 
 /**
- * Generates a direct WhatsApp click-to-chat URL with an encoded booking message
- * @param {string} [customMessage] - Optional custom booking text
+ * Generates a direct WhatsApp click-to-chat URL with an encoded message
+ * @param {string} [customMessage] - Optional custom text
  * @returns {string} WhatsApp web / deep link URL
  */
-export function buildWhatsAppUrl(customMessage = DEFAULT_BOOKING_MESSAGE) {
+export function buildWhatsAppUrl(customMessage = DEFAULT_HELP_MESSAGE) {
   const encodedText = encodeURIComponent(customMessage);
   return `https://wa.me/${WHATSAPP_PHONE_RAW}?text=${encodedText}`;
 }
@@ -22,7 +23,7 @@ export const siteData = {
   business: {
     name: "Glamour Emporium Unisex Salon",
     shortName: "Glamour Emporium",
-    tagline: "Unisex Salon",
+    tagline: "Unisex Salon in Panipat",
     address: {
       street: "Jattal Road, Near Choudhary Hospital",
       city: "Panipat",
@@ -31,12 +32,13 @@ export const siteData = {
       country: "India",
       fullAddress: "Jattal Road, Near Choudhary Hospital, Panipat, Haryana - 132103",
       googleMapsUrl: "https://maps.google.com/?q=Glamour+Emporium+Unisex+Salon+Jattal+Road+Near+Choudhary+Hospital+Panipat+Haryana+132103",
+      servingAreas: "Serving clients from Jattal Road, Model Town, New Model Town, Sat Kartar Nagar, and nearby Panipat areas.",
     },
     contact: {
       phoneDisplay: "+91 74950 68282",
       phoneTel: "+917495068282",
       whatsappNumber: WHATSAPP_PHONE_RAW,
-      defaultMessage: DEFAULT_BOOKING_MESSAGE,
+      defaultMessage: DEFAULT_HELP_MESSAGE,
     },
     social: {
       instagram: {
@@ -54,8 +56,8 @@ export const siteData = {
   ],
   booking: {
     ctaLabel: "Book your slot",
-    defaultMessage: DEFAULT_BOOKING_MESSAGE,
-    whatsappUrl: buildWhatsAppUrl(DEFAULT_BOOKING_MESSAGE),
+    defaultMessage: DEFAULT_HELP_MESSAGE,
+    whatsappUrl: buildWhatsAppUrl(DEFAULT_HELP_MESSAGE),
   },
 };
 
@@ -64,15 +66,15 @@ export default siteData;
 // Replace editorial references with approved salon photography when available.
 // These images are inspiration, not clients, staff, or the salon premises.
 export const editorialImages = {
-  woman: { src: "/images/editorial-woman.jpg", alt: "Editorial portrait of a woman with sculptural, voluminous curls", position: "50% 35%" },
-  man: { src: "/images/editorial-man.jpg", alt: "Black and white editorial portrait with textured men's hair", position: "50% 30%" },
-  detail: { src: "/images/salon-detail.jpg", alt: "Barber carefully shaping a haircut, an illustration of grooming craft", position: "50% 50%" },
-  texture: { src: "/images/texture-portrait.jpg", alt: "Editorial beauty portrait showing natural hair texture", position: "50% 35%" },
+  woman: { src: "/images/editorial-woman.jpg", alt: "Women's hair styling at Glamour Emporium salon in Panipat", position: "50% 35%" },
+  man: { src: "/images/editorial-man.jpg", alt: "Men's precision haircut and grooming at Glamour Emporium", position: "50% 30%" },
+  detail: { src: "/images/salon-detail.jpg", alt: "Hair cutting and styling craft at Glamour Emporium unisex salon", position: "50% 50%" },
+  texture: { src: "/images/texture-portrait.jpg", alt: "Hair care and styling texture portrait at Glamour Emporium", position: "50% 35%" },
 };
 
-// Broad enquiry categories, not a confirmed treatment or price list.
+// Customer-friendly service descriptions
 export const serviceCategories = [
-  { title: "Hair & styling", description: "A subtle refresh or a new direction. Tell us what you have in mind and let's talk about a look that feels like you." },
-  { title: "Men’s grooming", description: "From your everyday style to your next occasion, talk to us about your hair and grooming preferences." },
-  { title: "Beauty & care", description: "Make room for some self-care. Message us to explore the beauty and care options available for your visit." },
+  { title: "Hair & Styling", description: "From everyday haircuts and styling to colour and hair care, choose a service that suits your look, occasion and preferences." },
+  { title: "Men’s Grooming", description: "Haircuts, beard grooming and styling services designed for a clean, well-finished look." },
+  { title: "Beauty & Care", description: "Beauty and personal care services for everyday grooming, occasions and special moments." },
 ];

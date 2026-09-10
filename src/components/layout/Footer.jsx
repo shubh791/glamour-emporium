@@ -1,11 +1,15 @@
+"use client";
+
 import { ArrowUp, ArrowUpRight, Phone, MapPin, CalendarDays } from "lucide-react";
 import { siteData } from "@/data/siteData";
+import { useBooking } from "@/context/BookingContext";
 import BrandMark from "@/components/ui/BrandMark";
 import InstagramIcon from "@/components/ui/InstagramIcon";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
 export default function Footer() {
-  const { business, booking, navigation } = siteData;
+  const { business, navigation } = siteData;
+  const { openBooking } = useBooking();
   const currentYear = new Date().getFullYear();
 
   return (
@@ -31,7 +35,7 @@ export default function Footer() {
               descriptorClassName="text-[8px] sm:text-[11px]"
             />
             <p className="mt-3 sm:mt-4 max-w-md text-xs sm:text-sm text-[#eae6df]/70 font-sans leading-relaxed">
-              A luxury unisex hair, beauty and grooming destination on Jattal Road, Panipat.
+              A unisex hair, beauty and grooming salon on Jattal Road, Panipat.
             </p>
           </div>
 
@@ -39,17 +43,16 @@ export default function Footer() {
             <span className="text-[10px] font-mono tracking-[0.25em] uppercase text-[#c9a87c]">
               READY FOR YOUR NEXT LOOK?
             </span>
-            <a
-              href={booking.whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 bg-[#f5f2eb] text-[#0c0b0a] hover:bg-[#c9a87c] text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-300 min-h-[44px] group w-full sm:w-auto text-center"
+            <button
+              type="button"
+              onClick={() => openBooking()}
+              className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 bg-[#f5f2eb] text-[#0c0b0a] hover:bg-[#c9a87c] text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-300 min-h-[44px] group w-full sm:w-auto text-center cursor-pointer"
               style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
             >
               <CalendarDays className="w-3.5 h-3.5 text-[#0c0b0a]/80" />
-              <span>BOOK YOUR SLOT</span>
+              <span>BOOK A SLOT</span>
               <ArrowUpRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </a>
+            </button>
           </div>
         </div>
 
@@ -70,6 +73,11 @@ export default function Footer() {
             <p className="text-xs text-[#eae6df]/70 font-sans">
               {business.address.city}, {business.address.state} — {business.address.postalCode}
             </p>
+            {business.servingAreas && (
+              <p className="text-[11px] text-[#eae6df]/55 font-sans leading-relaxed">
+                {business.servingAreas}
+              </p>
+            )}
             <div className="pt-1">
               <a
                 href={business.address.googleMapsUrl}

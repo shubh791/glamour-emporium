@@ -7,6 +7,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { siteData } from "@/data/siteData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { useBooking } from "@/context/BookingContext";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -16,38 +17,39 @@ if (typeof window !== "undefined") {
 const heroScenes = [
   {
     id: "mens-precision-cut",
-    alt: "Masterclass Indian men's precision haircut and craft at Glamour Emporium",
+    alt: "Men's precision haircut and grooming at Glamour Emporium in Panipat",
     src: "/images/hero/campaign/mens-precision-cut.webp",
   },
   {
     id: "womens-hair-styling",
-    alt: "Bespoke Indian women's hair styling and blowout at Glamour Emporium",
+    alt: "Women's hair styling and blowout at Glamour Emporium salon in Panipat",
     src: "/images/hero/campaign/womens-hair-styling.webp",
   },
   {
     id: "mens-beard-grooming",
-    alt: "Precision beard detailing and men's grooming at Glamour Emporium",
+    alt: "Precision beard grooming and styling at Glamour Emporium on Jattal Road",
     src: "/images/hero/campaign/mens-beard-grooming.webp",
   },
   {
     id: "womens-hair-colour",
-    alt: "Dimensional balayage and luxury hair colour at Glamour Emporium",
+    alt: "Hair colour and balayage at Glamour Emporium salon in Panipat",
     src: "/images/hero/campaign/womens-hair-colour.webp",
   },
   {
     id: "beauty-care",
-    alt: "Professional beauty finishing treatment at Glamour Emporium",
+    alt: "Beauty and skin care treatment at Glamour Emporium in Panipat",
     src: "/images/hero/campaign/beauty-care.webp",
   },
   {
     id: "unisex-finished-look",
-    alt: "Signature unisex salon campaign at Glamour Emporium",
+    alt: "Glamour Emporium unisex salon on Jattal Road, Panipat",
     src: "/images/hero/campaign/unisex-finished-look.webp",
   },
 ];
 
 export default function Hero() {
   const [activeLookIndex, setActiveLookIndex] = useState(0);
+  const { openBooking } = useBooking();
 
   const containerRef = useRef(null);
   const headlineRef = useRef(null);
@@ -224,8 +226,8 @@ export default function Hero() {
               {/* Category Kicker */}
               <div className="hero-fade inline-flex items-center gap-2 mb-3 sm:mb-5">
                 <span className="h-[1px] w-6 bg-[#c9a87c]" />
-                <span className="text-[9px] sm:text-[10px] tracking-[0.32em] uppercase text-[#c9a87c] font-semibold">
-                  HAIR • BEAUTY • GROOMING
+                <span className="text-[9px] sm:text-[10px] tracking-[0.28em] uppercase text-[#c9a87c] font-semibold">
+                  HAIR • BEAUTY • GROOMING • PANIPAT
                 </span>
               </div>
 
@@ -248,29 +250,28 @@ export default function Hero() {
                 </span>
               </h1>
 
-              {/* Grounded, Real Supporting Copy */}
-              <p className="hero-fade mt-5 sm:mt-7 max-w-md text-sm sm:text-base text-[#eae6df] font-sans leading-relaxed">
-                Hair, beauty and grooming designed around you. For him. For her. For every version of you.
+              {/* Customer-Friendly Local Supporting Copy */}
+              <p className="hero-fade mt-4 sm:mt-6 max-w-lg text-sm sm:text-base text-[#eae6df] font-sans leading-relaxed">
+                Glamour Emporium is a unisex salon on Jattal Road, Panipat, offering hair, beauty and grooming services for men and women. Conveniently located near Choudhary Hospital, with easy access from Model Town and nearby areas.
               </p>
 
               {/* CTAs: Guaranteed High Contrast & Visible Text */}
               <div className="hero-fade mt-7 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 sm:gap-5">
                 
                 {/* Primary CTA: Visible Ivory with Dark Text & Champagne Hover Sweep */}
-                <a
-                  href={siteData.booking.whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative group inline-flex items-center justify-center gap-3 px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] hover:shadow-[0_4px_30px_rgba(201,168,124,0.35)] min-h-[48px] w-full sm:w-auto text-center"
+                <button
+                  type="button"
+                  onClick={() => openBooking()}
+                  className="relative group inline-flex items-center justify-center gap-3 px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] hover:shadow-[0_4px_30px_rgba(201,168,124,0.35)] min-h-[48px] w-full sm:w-auto text-center cursor-pointer"
                   style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
                 >
                   <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
                   <span className="relative z-10 flex items-center justify-center gap-2 font-bold text-[#0c0b0a]">
                     <CalendarDays className="w-4 h-4 text-[#0c0b0a]" />
-                    <span>BOOK YOUR SLOT</span>
+                    <span>BOOK A SLOT</span>
                     <ArrowUpRight className="w-4 h-4 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300" />
                   </span>
-                </a>
+                </button>
 
                 {/* Secondary CTA: Explore Services link */}
                 <a

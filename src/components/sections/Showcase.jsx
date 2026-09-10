@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { ArrowUpRight, CalendarDays } from "lucide-react";
 import { siteData } from "@/data/siteData";
+import { useBooking } from "@/context/BookingContext";
 import InstagramIcon from "@/components/ui/InstagramIcon";
 
 /**
@@ -44,7 +45,7 @@ const galleryItems = [
     label: "01 / LAYER",
     title: "Layered Movement",
     src: "/images/gallery/01-layered-haircut.webp",
-    alt: "Layered haircut styling at Glamour Emporium",
+    alt: "Women's layered haircut and blow dry at Glamour Emporium salon in Panipat",
     position: "50% 30%",
   },
   {
@@ -52,7 +53,7 @@ const galleryItems = [
     label: "02 / SHAPE",
     title: "Precision Silhouette",
     src: "/images/gallery/02-mens-textured-haircut.webp",
-    alt: "Men's contemporary textured haircut and low taper",
+    alt: "Men's textured haircut and beard grooming at Glamour Emporium in Panipat",
     position: "50% 25%",
   },
   {
@@ -60,7 +61,7 @@ const galleryItems = [
     label: "03 / TEXTURE",
     title: "Gloss & Waves",
     src: "/images/gallery/03-soft-waves-texture.webp",
-    alt: "Soft wave hair styling with natural volume",
+    alt: "Soft wavy hair styling and gloss treatment at Glamour Emporium in Panipat",
     position: "50% 25%",
   },
   {
@@ -68,7 +69,7 @@ const galleryItems = [
     label: "04 / COLOUR",
     title: "Dimensional Tone",
     src: "/images/gallery/04-dimensional-hair-colour.webp",
-    alt: "Dimensional brunette and caramel hair colour",
+    alt: "Dimensional brunette and caramel hair colouring at Glamour Emporium in Panipat",
     position: "50% 30%",
   },
   {
@@ -76,7 +77,7 @@ const galleryItems = [
     label: "05 / CRAFT",
     title: "Artisan Sectioning",
     src: "/images/gallery/05-mens-grooming-craft.webp",
-    alt: "Professional hairstylist cutting hair with precision shears",
+    alt: "Professional hair stylist cutting and styling hair at Glamour Emporium in Panipat",
     position: "50% 35%",
   },
   {
@@ -84,12 +85,14 @@ const galleryItems = [
     label: "06 / FINISH",
     title: "Tailored Polish",
     src: "/images/gallery/06-finished-hair-look.webp",
-    alt: "Finished salon hairstyle and polished transformation",
+    alt: "Finished salon hairstyle and transformation at Glamour Emporium in Panipat",
     position: "50% 25%",
   },
 ];
 
 export default function Showcase() {
+  const { openBooking } = useBooking();
+
   return (
     <section
       id="showcase"
@@ -110,14 +113,14 @@ export default function Showcase() {
               id="lookbook-heading"
               className="font-serif text-[clamp(2.5rem,5.5vw,4.5rem)] leading-[0.95] tracking-tight font-light text-[#292c27] mt-3"
             >
-              STYLE<br />
-              <span className="italic font-normal">IN MOTION.</span>
+              REAL LOOKS.<br />
+              <span className="italic font-normal">REAL STYLE.</span>
             </h2>
           </div>
 
           <div className="flex flex-col items-start md:items-end gap-3 pb-1">
             <p className="max-w-xs text-sm sm:text-base text-[#66685e] font-sans leading-relaxed md:text-right">
-              Cuts, texture, colour and finishing — seen differently.
+              Explore haircuts, grooming, styling and beauty looks from Glamour Emporium in Panipat.
             </p>
             <a
               href={siteData.business.social.instagram.url}
@@ -127,7 +130,7 @@ export default function Showcase() {
               style={{ color: "#f2f0e9", backgroundColor: "#292c27" }}
             >
               <InstagramIcon className="w-3.5 h-3.5 text-[#E1306C]" color="#E1306C" />
-              <span>EXPLORE INSTAGRAM</span>
+              <span>SEE MORE ON INSTAGRAM</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-white/70 group-hover:text-white transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </a>
           </div>
@@ -369,17 +372,16 @@ export default function Showcase() {
             &ldquo;Never ordinary. Always you.&rdquo;
           </p>
 
-          <a
-            href={siteData.booking.whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-[#292c27] text-[#f2f0e9] hover:bg-[#424839] text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-300 min-h-[44px] shadow-[0_4px_15px_rgba(41,44,39,0.12)] w-full sm:w-auto text-center"
+          <button
+            type="button"
+            onClick={() => openBooking()}
+            className="group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-[#292c27] text-[#f2f0e9] hover:bg-[#424839] text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-300 min-h-[44px] shadow-[0_4px_15px_rgba(41,44,39,0.12)] w-full sm:w-auto text-center cursor-pointer"
             style={{ color: "#f2f0e9", backgroundColor: "#292c27" }}
           >
             <CalendarDays className="w-3.5 h-3.5 text-[#f2f0e9]/80" />
-            <span>BOOK AN APPOINTMENT</span>
+            <span>BOOK A SLOT</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-white/70 group-hover:text-white transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </a>
+          </button>
         </div>
 
       </div>
