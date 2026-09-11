@@ -5,12 +5,25 @@ import BookingModal from "@/components/booking/BookingModal";
 import Navbar from "@/components/layout/Navbar";
 import Hero from "@/components/sections/Hero";
 import Services from "@/components/sections/Services";
+import ServicesExperimental from "@/components/sections/ServicesExperimental";
+import ServicesExperimentalV3 from "@/components/sections/ServicesExperimentalV3";
 import Experience from "@/components/sections/Experience";
 import Showcase from "@/components/sections/Showcase";
 import BookingCTA from "@/components/sections/BookingCTA";
 import Contact from "@/components/sections/Contact";
 import Footer from "@/components/layout/Footer";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
+
+// Preview: "original" | "v1" | "v2" | "v3". Change only this value to switch.
+const SERVICES_VARIANT = "v3";
+const SERVICE_VARIANTS = {
+  original: Services,
+  v1: ServicesExperimental,
+  // No separate V2 exists in this checkout; retain the preserved experiment.
+  v2: ServicesExperimental,
+  v3: ServicesExperimentalV3,
+};
+const SelectedServices = SERVICE_VARIANTS[SERVICES_VARIANT] || Services;
 
 /**
  * Main Page Entrypoint
@@ -26,7 +39,7 @@ export default function HomePage() {
         {/* Main Content Sections */}
         <main id="main-content" tabIndex={-1}>
           <Hero />
-          <Services />
+          <SelectedServices />
           <Experience />
           <Showcase />
           <BookingCTA />

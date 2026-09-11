@@ -157,6 +157,7 @@ export default function Hero() {
 
     if (container && window.matchMedia("(pointer: fine)").matches) {
       mouseMoveHandler = (e) => {
+        if (typeof document !== "undefined" && document.body.style.overflow === "hidden") return;
         const { clientX, clientY } = e;
         const { innerWidth, innerHeight } = window;
         const xPos = (clientX / innerWidth - 0.5) * 2;

@@ -33,7 +33,20 @@ export default function SmoothScroll({ children }) {
         wheelMultiplier: 0.95,
         touchMultiplier: 1.0,
         syncTouch: false,
+        prevent: (node) => {
+          if (!node) return false;
+          return Boolean(
+            node.closest?.('[data-lenis-prevent]') ||
+            node.closest?.('[role="dialog"]') ||
+            node.closest?.('.modal-scroll-area') ||
+            node.closest?.('.prevent-lenis')
+          );
+        },
       });
+
+      if (typeof window !== "undefined") {
+        window.__lenis = lenis;
+      }
 
       // Synchronize GSAP ScrollTrigger with Lenis
       lenis.on("scroll", ScrollTrigger.update);
@@ -68,6 +81,9 @@ export default function SmoothScroll({ children }) {
 
     return () => {
       disposed = true;
+      if (typeof window !== "undefined" && window.__lenis === lenis) {
+        window.__lenis = null;
+      }
       if (tickerCallback) gsap.ticker.remove(tickerCallback);
       if (lenis) lenis.destroy();
     };

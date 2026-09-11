@@ -21,11 +21,14 @@ import {
 import { useBooking } from "@/context/BookingContext";
 import {
   BOOKING_ADVANCE,
+  BOOKING_CATALOGUE,
   BOOKING_SERVICES,
   BOOKING_SLOTS,
   DEMO_UNAVAILABLE_SLOTS,
   ONLINE_BOOKING_OFFER,
   PAYMENT_STATUS,
+  getServicesForCategory,
+  normalizeServiceName,
   isTuesday,
   isPastDate,
   formatDisplayDate,
@@ -36,16 +39,19 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
 export default function BookingModal() {
-  const { isOpen, selectedService: prefilledService, closeBooking } = useBooking();
+  const { isOpen, bookingPayload, closeBooking } = useBooking();
   const prefersReducedMotion = useReducedMotion();
   const titleId = useId();
   const dateInputRef = useRef(null);
+  const scrollAreaRef = useRef(null);
+  const modalShellRef = useRef(null);
 
   // Form State
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
-    service: BOOKING_SERVICES[0],
+    category: "",
+    service: "",
     date: "",
     timeSlot: "",
     notes: "",
@@ -59,23 +65,54 @@ export default function BookingModal() {
   // Today string for min attribute in date picker
   const todayString = new Date().toISOString().split("T")[0];
 
-  // Sync pre-selected service & reset states when modal opens
+  // Sync pre-selected category/service & reset states when modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData((prev) => ({
         ...prev,
-        service: prefilledService || prev.service || BOOKING_SERVICES[0],
+        category: bookingPayload?.category || "",
+        service: bookingPayload?.service || "",
       }));
       setStep(1);
       setErrors({});
       setPaymentStatus(PAYMENT_STATUS.IDLE);
       setTransactionRef("");
     }
-  }, [isOpen, prefilledService]);
+  }, [isOpen, bookingPayload]);
 
-  // Lock body scroll when modal is open and handle Escape key
+  // Lock document/body scroll and freeze background when modal is open
   useEffect(() => {
     if (!isOpen) return;
+
+    // 1. Pause Lenis smooth-scroll instance for background page
+    if (typeof window !== "undefined" && window.__lenis) {
+      try {
+        window.__lenis.stop();
+      } catch {
+        // safety
+      }
+    }
+
+    // 2. Lock body scroll natively
+    const originalBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    // 3. Stop wheel/touch event propagation from modal to prevent global interception
+    const stopPropagation = (e) => {
+      e.stopPropagation();
+    };
+
+    const scrollEl = scrollAreaRef.current;
+    const shellEl = modalShellRef.current;
+
+    if (scrollEl) {
+      scrollEl.addEventListener("wheel", stopPropagation, { passive: true });
+      scrollEl.addEventListener("touchmove", stopPropagation, { passive: true });
+    }
+    if (shellEl) {
+      shellEl.addEventListener("wheel", stopPropagation, { passive: true });
+      shellEl.addEventListener("touchmove", stopPropagation, { passive: true });
+    }
 
     const handleKeyDown = (e) => {
       if (e.key === "Escape" && paymentStatus !== PAYMENT_STATUS.PROCESSING) {
@@ -84,12 +121,27 @@ export default function BookingModal() {
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
+      if (scrollEl) {
+        scrollEl.removeEventListener("wheel", stopPropagation);
+        scrollEl.removeEventListener("touchmove", stopPropagation);
+      }
+      if (shellEl) {
+        shellEl.removeEventListener("wheel", stopPropagation);
+        shellEl.removeEventListener("touchmove", stopPropagation);
+      }
+      document.body.style.overflow = originalBodyOverflow;
+
+      // Resume Lenis smooth-scroll instance
+      if (typeof window !== "undefined" && window.__lenis) {
+        try {
+          window.__lenis.start();
+        } catch {
+          // safety
+        }
+      }
     };
   }, [isOpen, paymentStatus, closeBooking]);
 
@@ -105,6 +157,25 @@ export default function BookingModal() {
 
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleCategoryChange = (newCategory) => {
+    setFormData((prev) => {
+      const servicesInNewCat = getServicesForCategory(newCategory);
+      const isServiceInNewCat = servicesInNewCat.some(
+        (s) => normalizeServiceName(s.name) === normalizeServiceName(prev.service)
+      );
+
+      return {
+        ...prev,
+        category: newCategory,
+        service: isServiceInNewCat ? prev.service : "",
+      };
+    });
+
+    if (errors.category) {
+      setErrors((prev) => ({ ...prev, category: "", service: "" }));
     }
   };
 
@@ -124,8 +195,8 @@ export default function BookingModal() {
       newErrors.phone = "Please enter a valid phone number (at least 8 digits)";
     }
 
-    if (!formData.service) {
-      newErrors.service = "Please choose a service";
+    if (!formData.category) {
+      newErrors.category = "Please select a service category";
     }
 
     if (!formData.date) {
@@ -198,12 +269,14 @@ export default function BookingModal() {
     <AnimatePresence>
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+          data-lenis-prevent="true"
+          data-lenis-prevent
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden"
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
         >
-          {/* Backdrop Blur */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -214,8 +287,13 @@ export default function BookingModal() {
             aria-hidden="true"
           />
 
-          {/* Modal Container */}
+          {/* Modal Container Shell */}
           <motion.div
+            ref={modalShellRef}
+            data-lenis-prevent="true"
+            data-lenis-prevent
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
             initial={
               prefersReducedMotion
                 ? { opacity: 0 }
@@ -228,10 +306,10 @@ export default function BookingModal() {
                 : { opacity: 0, scale: 0.96, y: 16 }
             }
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 w-full max-w-xl max-h-[92dvh] bg-[#121110] text-[#f5f2eb] border border-white/15 shadow-[0_25px_60px_rgba(0,0,0,0.85)] flex flex-col my-auto overflow-hidden rounded-none"
+            className="relative z-10 w-full max-w-xl max-h-[90dvh] sm:max-h-[92dvh] bg-[#121110] text-[#f5f2eb] border border-white/15 shadow-[0_25px_60px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden rounded-none my-auto"
           >
-            {/* Modal Header Bar */}
-            <div className="relative flex items-center justify-between px-5 sm:px-7 py-3.5 border-b border-white/10 bg-[#0c0b0a]/90">
+            {/* Modal Header Bar (Fixed / Sticky at top) */}
+            <div className="shrink-0 z-20 flex items-center justify-between px-5 sm:px-7 py-3.5 border-b border-white/10 bg-[#0c0b0a]">
               <div className="flex items-center gap-2.5">
                 <div className="relative w-6 h-6 rounded-full overflow-hidden border border-[#c9a87c]/50 shrink-0">
                   <Image
@@ -267,8 +345,8 @@ export default function BookingModal() {
               )}
             </div>
 
-            {/* Advance Explanation Banner */}
-            <div className="bg-[#1a1815] border-b border-[#c9a87c]/20 px-5 sm:px-7 py-2 flex items-center justify-between gap-2 text-xs">
+            {/* Advance Explanation Banner (Sticky directly below header) */}
+            <div className="shrink-0 z-10 bg-[#1a1815] border-b border-[#c9a87c]/20 px-5 sm:px-7 py-2 flex items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-2 min-w-0">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#c9a87c] shrink-0" />
                 <p className="text-[11px] sm:text-xs font-mono text-[#eae6df] leading-tight truncate">
@@ -281,8 +359,24 @@ export default function BookingModal() {
               </span>
             </div>
 
-            {/* Scrollable Content Body */}
-            <div className="p-5 sm:p-7 overflow-y-auto max-h-[calc(92dvh-125px)] space-y-5">
+            {/* Scrollable Content Body (The ONLY area that scrolls) */}
+            <div
+              ref={scrollAreaRef}
+              data-lenis-prevent="true"
+              data-lenis-prevent
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+              className="modal-scroll-area flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-5 sm:p-7 space-y-5"
+              style={{
+                flex: "1 1 0%",
+                minHeight: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+                WebkitOverflowScrolling: "touch",
+                overscrollBehavior: "contain",
+                touchAction: "pan-y",
+              }}
+            >
               
               {/* ============================================================ */}
               {/* STEP 1: Details & Slot Selection Form                        */}
@@ -355,34 +449,94 @@ export default function BookingModal() {
 
                   </div>
 
-                  {/* Row 2: Service & Date */}
+                  {/* Row 2: Service Category & Specific Service */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                     
-                    {/* Service Dropdown (Preserved & Visually Locked if Tuesday) */}
+                    {/* 1. Service Category */}
                     <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
                       <label
-                        htmlFor="booking-service"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85"
+                        htmlFor="booking-category"
+                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center justify-between"
                       >
-                        Service <span className="text-[#c9a87c]">*</span>
+                        <span>SERVICE CATEGORY <span className="text-[#c9a87c]">*</span></span>
                       </label>
                       <div className="relative">
                         <select
-                          id="booking-service"
+                          id="booking-category"
                           disabled={isSelectedDateTuesday}
+                          value={formData.category}
+                          onChange={(e) => handleCategoryChange(e.target.value)}
+                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed ${
+                            errors.category
+                              ? "border-[#df9b8a] focus:border-[#df9b8a]"
+                              : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
+                          }`}
+                        >
+                          <option value="" className="bg-[#141312] text-[#eae6df]/50">
+                            Choose Category...
+                          </option>
+                          {BOOKING_CATALOGUE.map((cat) => (
+                            <option key={cat.id} value={cat.category} className="bg-[#141312] text-[#f5f2eb]">
+                              {cat.category}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#c9a87c]/70">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </div>
+                      </div>
+                      {errors.category && !isSelectedDateTuesday && (
+                        <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                          {errors.category}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 2. Specific Service */}
+                    <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="booking-service"
+                          className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85"
+                        >
+                          SERVICE
+                        </label>
+                        {formData.category && (
+                          <span className="text-[9px] font-mono text-[#eae6df]/50 uppercase">
+                            Optional
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <select
+                          id="booking-service"
+                          disabled={isSelectedDateTuesday || !formData.category}
                           value={formData.service}
                           onChange={(e) => handleChange("service", e.target.value)}
-                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed ${
+                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
                             errors.service
                               ? "border-[#df9b8a] focus:border-[#df9b8a]"
                               : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
                           }`}
                         >
-                          {BOOKING_SERVICES.map((srv) => (
-                            <option key={srv} value={srv} className="bg-[#141312] text-[#f5f2eb]">
-                              {srv}
+                          {!formData.category ? (
+                            <option value="" className="bg-[#141312] text-[#eae6df]/50">
+                              Select Category First
                             </option>
-                          ))}
+                          ) : (
+                            <>
+                              <option value="" className="bg-[#141312] text-[#eae6df]/60">
+                                General / Consultation or Choose Service...
+                              </option>
+                              {getServicesForCategory(formData.category).map((srv) => (
+                                <option key={srv.name} value={srv.name} className="bg-[#141312] text-[#f5f2eb]">
+                                  {srv.name}
+                                </option>
+                              ))}
+                            </>
+                          )}
                         </select>
                         <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#c9a87c]/70">
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -397,49 +551,49 @@ export default function BookingModal() {
                       )}
                     </div>
 
-                    {/* Preferred Date (ALWAYS INTERACTIVE & VISUAL FOCUS ON TUESDAY) */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label
-                          htmlFor="booking-date"
-                          className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
-                        >
-                          <CalendarDays className="w-3 h-3 text-[#c9a87c]" />
-                          <span>Preferred Date <span className="text-[#c9a87c]">*</span></span>
-                        </label>
-                        {isSelectedDateTuesday && (
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#df9b8a] font-semibold">
-                            TUESDAY · CLOSED
-                          </span>
-                        )}
-                      </div>
-                      <input
-                        ref={dateInputRef}
-                        id="booking-date"
-                        type="date"
-                        min={todayString}
-                        value={formData.date}
-                        onChange={(e) => handleChange("date", e.target.value)}
-                        style={{ colorScheme: "dark" }}
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
-                          errors.date
-                            ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                            : isSelectedDateTuesday
-                            ? "border-[#c9a87c] ring-1 ring-[#c9a87c]/50 shadow-[0_0_14px_rgba(201,168,124,0.2)]"
-                            : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                        }`}
-                      />
-                      {isSelectedDateTuesday ? (
-                        <p className="text-[10.5px] text-[#eae6df]/65 font-sans mt-0.5">
-                          Choose any date except Tuesday.
-                        </p>
-                      ) : errors.date ? (
-                        <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                          {errors.date}
-                        </span>
-                      ) : null}
-                    </div>
+                  </div>
 
+                  {/* Row 3: Preferred Date (ALWAYS INTERACTIVE & VISUAL FOCUS ON TUESDAY) */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="booking-date"
+                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
+                      >
+                        <CalendarDays className="w-3 h-3 text-[#c9a87c]" />
+                        <span>Preferred Date <span className="text-[#c9a87c]">*</span></span>
+                      </label>
+                      {isSelectedDateTuesday && (
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#df9b8a] font-semibold">
+                          TUESDAY · CLOSED
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      ref={dateInputRef}
+                      id="booking-date"
+                      type="date"
+                      min={todayString}
+                      value={formData.date}
+                      onChange={(e) => handleChange("date", e.target.value)}
+                      style={{ colorScheme: "dark" }}
+                      className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
+                        errors.date
+                          ? "border-[#df9b8a] focus:border-[#df9b8a]"
+                          : isSelectedDateTuesday
+                          ? "border-[#c9a87c] ring-1 ring-[#c9a87c]/50 shadow-[0_0_14px_rgba(201,168,124,0.2)]"
+                          : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
+                      }`}
+                    />
+                    {isSelectedDateTuesday ? (
+                      <p className="text-[10.5px] text-[#eae6df]/65 font-sans mt-0.5">
+                        Choose any date except Tuesday.
+                      </p>
+                    ) : errors.date ? (
+                      <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                        {errors.date}
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* Refined Tuesday Closed Notice */}
@@ -604,9 +758,14 @@ export default function BookingModal() {
                         <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
                           Service
                         </span>
-                        <span className="font-medium text-[#c9a87c] text-sm">
-                          {formData.service}
+                        <span className="font-medium text-[#c9a87c] text-sm block">
+                          {formData.service || formData.category}
                         </span>
+                        {formData.service && formData.category && formData.service !== formData.category && (
+                          <span className="text-[11px] text-[#eae6df]/60 block font-normal font-sans">
+                            {formData.category}
+                          </span>
+                        )}
                       </div>
                       <div>
                         <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
@@ -725,9 +884,14 @@ export default function BookingModal() {
                         <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
                           Service
                         </span>
-                        <span className="font-medium text-[#c9a87c]">
-                          {formData.service}
+                        <span className="font-medium text-[#c9a87c] block">
+                          {formData.service || formData.category}
                         </span>
+                        {formData.service && formData.category && formData.service !== formData.category && (
+                          <span className="text-[10px] text-[#eae6df]/60 block font-sans">
+                            {formData.category}
+                          </span>
+                        )}
                       </div>
                       <div>
                         <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">

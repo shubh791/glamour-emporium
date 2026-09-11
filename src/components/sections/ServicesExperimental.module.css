@@ -1,0 +1,140 @@
+/* Isolated experiment: no selectors or tokens affect the approved Services. */
+.section {
+  --service-gold: #896b3e;
+  padding-block: clamp(48px, 6vw, 88px);
+  background: var(--background);
+  color: var(--foreground);
+  border-top: 1px solid var(--border);
+}
+
+.container { max-width: 1280px; margin-inline: auto; padding-inline: 24px; }
+.intro { display: flex; justify-content: space-between; align-items: end; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid var(--border); }
+.eyebrow { display: block; font-size: 10px; font-weight: 500; line-height: 1.5; letter-spacing: .19em; color: var(--muted); }
+.heading { margin-top: 14px; font-family: var(--font-display); font-weight: 400; font-size: clamp(48px, 5.7vw, 78px); line-height: .88; letter-spacing: -.045em; }
+.heading em { font-weight: 400; }
+.introCopy { max-width: 34ch; padding-bottom: 3px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+
+/* One catalogue, with the portrait on the facing page of the spread. */
+.spread { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr); gap: 7%; margin-top: 36px; align-items: start; }
+.categories { min-width: 0; }
+.category { border-bottom: 1px solid var(--border); }
+.categoryTrigger { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) 24px; gap: 15px; align-items: center; width: 100%; min-height: 83px; padding: 20px 3px; border: 0; background: transparent; color: var(--muted); text-align: left; cursor: pointer; }
+.categoryTrigger::after { content: ""; position: absolute; bottom: 0; left: 0; width: 100%; height: 1px; background: var(--service-gold); transform: scaleX(0); transform-origin: left; transition: transform .4s var(--ease); }
+.categoryTrigger:hover::after, .categoryTrigger:focus-visible::after { transform: scaleX(1); }
+.categoryTrigger:focus-visible { outline: 2px solid var(--service-gold); outline-offset: -2px; }
+.number { font-family: var(--font-display); font-size: 24px; font-style: italic; transition: transform .3s var(--ease), color .3s; }
+.categoryName { font-family: var(--font-display); font-weight: 400; font-size: clamp(25px, 2.65vw, 36px); letter-spacing: -.035em; line-height: 1.08; transition: transform .3s var(--ease), color .3s; }
+.categoryArrow { justify-self: end; transition: transform .3s var(--ease), color .3s; }
+.categoryTrigger:hover .categoryName { transform: translateX(2px); color: var(--foreground); }
+.categoryTrigger:hover .number { transform: translateY(-2px); color: var(--service-gold); }
+.categoryTrigger:hover .categoryArrow { transform: translate(2px, -2px); }
+.category[data-active="true"] .categoryName { color: var(--foreground); }
+.category[data-active="true"] .number { color: var(--service-gold); }
+.category[data-active="true"] .categoryArrow { transform: rotate(90deg); color: var(--service-gold); }
+.category[data-active="true"] .categoryTrigger:hover .categoryArrow { transform: rotate(90deg) translate(2px, -2px); }
+.panelClip { overflow: hidden; }
+.details { padding: 2px 3px 29px 54px; }
+.currentLabel { display: flex; align-items: center; gap: 12px; font-size: 8px; letter-spacing: .14em; line-height: 1.5; color: var(--service-gold); }
+.currentLabel > span:last-child { color: var(--muted); }
+.currentRule { height: 1px; min-width: 18px; flex: 1; background: var(--border); }
+.description { max-width: 48ch; margin-top: 18px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.catalogue { margin-top: 24px; }
+.catalogue > .eyebrow { font-size: 8px; letter-spacing: .16em; margin-bottom: 9px; }
+.serviceList { padding: 0; margin: 0; list-style: none; }
+.serviceList li { border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+.serviceList li:last-child { border-bottom: 0; }
+.serviceList a { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; padding-block: 9px; color: var(--foreground); font-size: 12px; line-height: 1.45; }
+.serviceList svg { flex-shrink: 0; color: var(--service-gold); transition: transform .25s var(--ease); }
+.serviceList a:hover span { text-decoration: underline; text-decoration-color: var(--service-gold); text-underline-offset: 4px; }
+.serviceList a:hover svg { transform: translate(2px, -2px); }
+.serviceList a:focus-visible { outline-offset: 1px; }
+.bookingAction { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 24px; }
+.bookButton { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; padding: 13px 19px; background: var(--foreground); color: var(--inverse); border: 1px solid var(--foreground); font-size: 10px; font-weight: 500; letter-spacing: .15em; cursor: pointer; transition: background .25s; }
+.bookButton:hover { background: #3f4339; }
+.bookButton svg:last-child { margin-left: 9px; transition: transform .3s var(--ease); }
+.bookButton:hover svg:last-child { transform: translate(3px, -3px); }
+.advance { color: var(--muted); font-size: 10px; line-height: 1.5; max-width: 23ch; }
+
+/* Fine framing and a fixed image stage keep category dissolves stable. */
+.visual { position: relative; padding-left: 24px; border-left: 1px solid var(--border); }
+.visual::before { content: ""; position: absolute; left: -34px; top: 42px; width: 34px; height: 1px; background: var(--service-gold); }
+.visualMasthead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.visualMasthead .eyebrow { font-size: 8px; }
+.pageIndex { font-size: 10px; letter-spacing: .12em; color: var(--service-gold); }
+.pageIndex > span { margin-left: 6px; color: var(--muted); }
+.imageFrame { position: relative; aspect-ratio: 4 / 5; background: var(--surface); overflow: hidden; }
+.imageLayer { position: absolute; inset: 0; }
+.image { object-fit: cover; }
+.imageShade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, #0004, transparent 25%, transparent 55%, #0009); }
+.imageDescriptor { position: absolute; top: 21px; left: 22px; color: #fff; font-size: 8px; letter-spacing: .17em; }
+.imageSignature { position: absolute; right: 22px; top: 18px; display: flex; align-items: center; gap: 7px; color: #fff; font-size: 7px; letter-spacing: .12em; }
+.imageSignature img { border-radius: 50%; }
+.imageCaption { position: absolute; bottom: 26px; left: 26px; right: 26px; display: flex; align-items: center; gap: 17px; color: var(--inverse); font-size: 9px; letter-spacing: .15em; }
+.imageNumber { font-family: var(--font-display); font-size: 58px; font-style: italic; letter-spacing: -.04em; line-height: 1; }
+.caption { display: flex; justify-content: space-between; gap: 16px; margin-top: 12px; color: var(--muted); font-size: 8px; letter-spacing: .12em; }
+.visualProgress { display: flex; gap: 6px; margin-top: 22px; }
+.visualProgress span { height: 1px; background: var(--border); flex: 1; position: relative; }
+.visualProgress span::after { content: ""; position: absolute; inset: 0; background: var(--service-gold); transform: scaleX(0); transform-origin: left; transition: transform .4s var(--ease); }
+.visualProgress span[data-current="true"]::after { transform: scaleX(1); }
+.mobilePortrait { display: none; }
+
+.customEnquiry { display: flex; justify-content: space-between; align-items: center; gap: 28px; border-top: 1px solid var(--border); padding-top: 27px; margin-top: 40px; }
+.customEnquiry .eyebrow { font-size: 9px; }
+.customEnquiry p { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.enquiryLink { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; border-bottom: 1px solid var(--service-gold); color: var(--foreground); font-size: 10px; font-weight: 500; letter-spacing: .1em; flex-shrink: 0; }
+.whatsappIcon { width: 16px; height: 16px; }
+.enquiryLink > svg:last-child { transition: transform .3s var(--ease); }
+.enquiryLink:hover > svg:last-child { transform: translate(3px, -3px); }
+
+@media (min-width: 1280px) {
+  .container { padding-inline: 32px; }
+}
+
+@media (max-width: 1023px) {
+  .container { max-width: 760px; }
+  .intro { gap: 24px; padding-bottom: 28px; }
+  .heading { font-size: 58px; }
+  .introCopy { max-width: 29ch; font-size: 13px; }
+  .spread { display: block; margin-top: 20px; }
+  .visual { display: none; }
+  .categoryTrigger { min-height: 76px; }
+  .categoryName { font-size: 32px; }
+  .details { padding-left: 54px; }
+  .description { max-width: 56ch; }
+  .mobilePortrait { display: block; margin-top: 20px; }
+  .mobilePortrait .imageFrame { aspect-ratio: auto; height: 300px; }
+  .mobilePortrait .caption { font-size: 8px; }
+  .bookingAction { gap: 12px; }
+  .bookButton { width: 100%; }
+  .advance { max-width: none; width: 100%; text-align: center; }
+  .customEnquiry { margin-top: 28px; align-items: start; }
+}
+
+@media (max-width: 599px) {
+  .container { padding-inline: 20px; }
+  .intro { display: block; padding-bottom: 24px; }
+  .heading { font-size: clamp(46px, 12vw, 64px); margin-top: 12px; }
+  .introCopy { max-width: 40ch; margin-top: 20px; font-size: 13px; line-height: 1.65; }
+  .spread { margin-top: 10px; }
+  .categoryTrigger { grid-template-columns: 25px minmax(0, 1fr) 19px; gap: 9px; min-height: 70px; padding-block: 18px; }
+  .number { font-size: 20px; }
+  .categoryName { font-size: clamp(22px, 5.8vw, 31px); }
+  .categoryArrow { width: 18px; }
+  .details { padding: 0 3px 24px; }
+  .currentLabel { font-size: 8px; gap: 10px; }
+  .description { margin-top: 14px; font-size: 13px; }
+  .catalogue { margin-top: 20px; }
+  .mobilePortrait .imageFrame { height: clamp(215px, 65vw, 280px); }
+  .imageDescriptor { top: 16px; left: 15px; font-size: 7px; }
+  .imageSignature { top: 12px; right: 15px; font-size: 6px; }
+  .imageCaption { bottom: 17px; left: 18px; gap: 13px; font-size: 8px; }
+  .imageNumber { font-size: 44px; }
+  .bookingAction { margin-top: 20px; }
+  .customEnquiry { flex-direction: column; gap: 15px; padding-top: 24px; }
+  .customEnquiry .eyebrow { font-size: 8px; }
+  .customEnquiry p { font-size: 12px; line-height: 1.7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section *, .section *::before, .section *::after { transition: none !important; animation: none !important; }
+}

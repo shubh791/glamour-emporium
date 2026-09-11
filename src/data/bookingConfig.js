@@ -22,7 +22,54 @@ export const PROMO_STRIP_CONFIG = {
   ctaLabel: "BOOK A SLOT",
 };
 
-// Verified Service Categories for Booking
+// Verified Service Catalogue for Booking (Single Source of Truth)
+export const BOOKING_CATALOGUE = [
+  {
+    id: "01",
+    category: "Hair & Styling",
+    descriptor: "WOMEN & MEN",
+    shortDesc:
+      "From everyday haircuts and styling to colour and hair care, choose a service that suits your look, occasion and preferences.",
+    services: [
+      { name: "Haircut", subtitle: "Personalized to face shape & natural texture" },
+      { name: "Hair Styling & Blow Dry", subtitle: "Volume, movement and finish" },
+      { name: "Hair Colour & Balayage", subtitle: "Dimensional tone & highlights" },
+      { name: "Restorative Hair Care / Spa", subtitle: "Deep nourishment & strand repair" },
+      { name: "Scalp Health Therapy", subtitle: "Cleansing & revitalization" },
+    ],
+  },
+  {
+    id: "02",
+    category: "Men’s Grooming",
+    aliases: ["Men's Grooming", "MEN'S GROOMING", "MENS GROOMING"],
+    descriptor: "TAILORED GROOMING",
+    shortDesc:
+      "Haircuts, beard grooming and styling services designed for a clean, well-finished look.",
+    services: [
+      { name: "Tailored Scissor Cut", subtitle: "Precision cutting & silhouette shaping" },
+      { name: "Fade & Taper Cut", subtitle: "Clean low fade & textured crown" },
+      { name: "Beard Grooming & Detailing", subtitle: "Sharp perimeter lines & beard care" },
+      { name: "Head Massage & Scalp Care", subtitle: "Relaxing cleanse & scalp health" },
+      { name: "Occasion Styling", subtitle: "Refined finish for events and everyday" },
+    ],
+  },
+  {
+    id: "03",
+    category: "Beauty & Care",
+    descriptor: "SKIN & RITUALS",
+    shortDesc:
+      "Beauty and personal care services for everyday grooming, occasions and special moments.",
+    services: [
+      { name: "Facial & Skin Care", subtitle: "Hydrating, glow-enhancing skin care" },
+      { name: "Hair Spa & Scalp Revival", subtitle: "Deep conditioning & follicle therapy" },
+      { name: "Grooming & Clean Up", subtitle: "Gentle cleanse, exfoliation & renewal" },
+      { name: "Detailing & Care Rituals", subtitle: "Refined grooming & finishing touches" },
+      { name: "Style Consultation", subtitle: "One-on-one styling & care dialogue" },
+    ],
+  },
+];
+
+// Verified Service Categories for legacy compatibility
 export const BOOKING_SERVICES = [
   "Hair & Styling",
   "Men’s Grooming",
@@ -30,6 +77,98 @@ export const BOOKING_SERVICES = [
   "Hair Colour & Balayage",
   "Custom Consultation",
 ];
+
+/**
+ * Normalizes service / category names for robust case and character matching
+ * @param {string} value 
+ * @returns {string}
+ */
+export function normalizeServiceName(value = "") {
+  return String(value)
+    .replace(/[’‘']/g, "'")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Finds the category object by category title, alias or matching sub-service name
+ * @param {string} categoryOrServiceName 
+ * @returns {Object|null}
+ */
+export function findCategory(categoryOrServiceName = "") {
+  if (!categoryOrServiceName) return null;
+  const target = normalizeServiceName(categoryOrServiceName);
+  return (
+    BOOKING_CATALOGUE.find((cat) => {
+      if (normalizeServiceName(cat.category) === target) return true;
+      if (cat.aliases && cat.aliases.some((a) => normalizeServiceName(a) === target)) return true;
+      return cat.services.some((s) => normalizeServiceName(s.name) === target);
+    }) || null
+  );
+}
+
+/**
+ * Extracts canonical category and service from provided input
+ * @param {string} categoryOrService 
+ * @param {string} [optionalService] 
+ * @returns {{category: string, service: string}}
+ */
+export function findServiceDetails(categoryOrService = "", optionalService = "") {
+  if (!categoryOrService && !optionalService) {
+    return { category: "", service: "" };
+  }
+
+  // If both category and service are explicitly provided
+  if (categoryOrService && optionalService) {
+    const cat = findCategory(categoryOrService) || findCategory(optionalService);
+    const catName = cat ? cat.category : categoryOrService;
+    const matchedService = cat?.services.find(
+      (s) => normalizeServiceName(s.name) === normalizeServiceName(optionalService)
+    );
+    return {
+      category: catName,
+      service: matchedService ? matchedService.name : optionalService,
+    };
+  }
+
+  const query = categoryOrService || optionalService;
+  const cat = findCategory(query);
+
+  if (!cat) {
+    return { category: "", service: query };
+  }
+
+  const isCategoryMatch =
+    normalizeServiceName(cat.category) === normalizeServiceName(query) ||
+    (cat.aliases && cat.aliases.some((a) => normalizeServiceName(a) === normalizeServiceName(query)));
+
+  if (isCategoryMatch) {
+    return {
+      category: cat.category,
+      service: "",
+    };
+  }
+
+  const matchedService = cat.services.find(
+    (s) => normalizeServiceName(s.name) === normalizeServiceName(query)
+  );
+
+  return {
+    category: cat.category,
+    service: matchedService ? matchedService.name : query,
+  };
+}
+
+/**
+ * Gets sub-services array for a given category
+ * @param {string} categoryName 
+ * @returns {Array}
+ */
+export function getServicesForCategory(categoryName = "") {
+  if (!categoryName) return [];
+  const cat = findCategory(categoryName);
+  return cat ? cat.services : [];
+}
 
 // Available Time Slots (Editable frontend config — ready for server availability sync)
 export const BOOKING_SLOTS = [
@@ -125,15 +264,21 @@ export function buildCustomerWhatsAppConfirmationMessage({
   name,
   phone,
   service,
+  category,
   date,
   timeSlot,
 }) {
   const formattedDate = formatDisplayDate(date);
+  const serviceDisplayName = service
+    ? (category && service !== category && !service.toLowerCase().includes(category.toLowerCase())
+        ? `${service} (${category})`
+        : service)
+    : (category || "Salon Service");
 
   return (
     `Hello ${name.trim()} 👋\n\n` +
     `Your appointment at Glamour Emporium has been confirmed.\n\n` +
-    `Service: ${service}\n` +
+    `Service: ${serviceDisplayName}\n` +
     `Date: ${formattedDate || date}\n` +
     `Time: ${timeSlot}\n` +
     `Booking Advance: ₹${BOOKING_ADVANCE} — Paid\n\n` +
@@ -155,16 +300,22 @@ export function buildStaffBookingNotificationMessage({
   name,
   phone,
   service,
+  category,
   date,
   timeSlot,
 }) {
   const formattedDate = formatDisplayDate(date);
+  const serviceDisplayName = service
+    ? (category && service !== category && !service.toLowerCase().includes(category.toLowerCase())
+        ? `${service} (${category})`
+        : service)
+    : (category || "Salon Service");
 
   return (
     `NEW APPOINTMENT BOOKING\n\n` +
     `Customer: ${name.trim()}\n` +
     `Phone: ${phone.trim()}\n\n` +
-    `Service: ${service}\n` +
+    `Service: ${serviceDisplayName}\n` +
     `Date: ${formattedDate || date}\n` +
     `Time: ${timeSlot}\n\n` +
     `Booking Advance: ₹${BOOKING_ADVANCE} PAID\n\n` +

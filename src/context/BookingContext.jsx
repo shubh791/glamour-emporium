@@ -1,10 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
-import { BOOKING_SERVICES } from "@/data/bookingConfig";
+import { createContext, useContext, useState, useCallback } from "react";
+import { findServiceDetails } from "@/data/bookingConfig";
 
 const BookingContext = createContext({
   isOpen: false,
+  bookingPayload: { category: "", service: "" },
+  selectedCategory: "",
   selectedService: "",
   openBooking: () => {},
   closeBooking: () => {},
@@ -12,16 +14,25 @@ const BookingContext = createContext({
 
 export function BookingProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState("");
+  const [bookingPayload, setBookingPayload] = useState({ category: "", service: "" });
 
-  const openBooking = useCallback((serviceName = "") => {
-    if (serviceName && typeof serviceName === "string") {
-      const match = BOOKING_SERVICES.find(
-        (s) => s.toLowerCase() === serviceName.toLowerCase()
+  const openBooking = useCallback((serviceOrPayload = "", maybeCategory = "") => {
+    if (!serviceOrPayload && !maybeCategory) {
+      setBookingPayload({ category: "", service: "" });
+    } else if (typeof serviceOrPayload === "object" && serviceOrPayload !== null) {
+      const details = findServiceDetails(
+        serviceOrPayload.category || "",
+        serviceOrPayload.service || ""
       );
-      setSelectedService(match || serviceName);
+      setBookingPayload(details);
+    } else if (maybeCategory && typeof maybeCategory === "string") {
+      const details = findServiceDetails(maybeCategory, serviceOrPayload);
+      setBookingPayload(details);
+    } else if (typeof serviceOrPayload === "string") {
+      const details = findServiceDetails(serviceOrPayload);
+      setBookingPayload(details);
     } else {
-      setSelectedService("");
+      setBookingPayload({ category: "", service: "" });
     }
     setIsOpen(true);
   }, []);
@@ -34,7 +45,9 @@ export function BookingProvider({ children }) {
     <BookingContext.Provider
       value={{
         isOpen,
-        selectedService,
+        bookingPayload,
+        selectedCategory: bookingPayload.category,
+        selectedService: bookingPayload.service || bookingPayload.category,
         openBooking,
         closeBooking,
       }}
