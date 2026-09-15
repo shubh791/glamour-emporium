@@ -19,10 +19,10 @@ export default function Navbar() {
   const { openBooking } = useBooking();
 
   const navLinks = [
-    { label: "Services", href: "#services", number: "01" },
-    { label: "Experience", href: "#experience", number: "02" },
-    { label: "Gallery", href: "#showcase", number: "03" },
-    { label: "Contact", href: "#contact", number: "04" },
+    { label: "Services", href: "/#services", number: "01" },
+    { label: "Experience", href: "/#experience", number: "02" },
+    { label: "Gallery", href: "/#showcase", number: "03" },
+    { label: "Contact", href: "/#contact", number: "04" },
   ];
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function Navbar() {
           {/* ============================================================ */}
           <div className="hidden lg:flex items-center">
             <a
-              href="#hero"
+              href="/#hero"
               className="group flex items-center gap-3.5 focus-visible:outline-none"
               aria-label={`${siteData.business.name} — Home`}
             >
@@ -106,7 +106,7 @@ export default function Navbar() {
           {/* MOBILE BRAND (Left: Official Emblem + Brand Name)            */}
           {/* ============================================================ */}
           <a
-            href="#hero"
+            href="/#hero"
             className="flex lg:hidden items-center gap-2.5 sm:gap-3 min-w-0 flex-1 mr-2 group focus-visible:outline-none"
             aria-label={`${siteData.business.name} — Home`}
             onClick={() => setMobileMenuOpen(false)}

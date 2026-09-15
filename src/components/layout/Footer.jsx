@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowUp, ArrowUpRight, Phone, MapPin, CalendarDays } from "lucide-react";
 import { siteData } from "@/data/siteData";
 import { useBooking } from "@/context/BookingContext";
@@ -8,7 +9,7 @@ import InstagramIcon from "@/components/ui/InstagramIcon";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
 export default function Footer() {
-  const { business, navigation } = siteData;
+  const { business, navigation, legalLinks } = siteData;
   const { openBooking } = useBooking();
   const currentYear = new Date().getFullYear();
 
@@ -19,7 +20,7 @@ export default function Footer() {
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[50vw] h-[30vw] rounded-full bg-[#c9a87c]/5 blur-[140px]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col gap-16">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col gap-14">
         
         {/* ============================================================ */}
         {/* FOOTER TOP: Dramatic BrandMark + Quick WhatsApp CTA          */}
@@ -59,7 +60,7 @@ export default function Footer() {
         {/* ============================================================ */}
         {/* FOOTER MIDDLE: Clean Unboxed Information Columns             */}
         {/* ============================================================ */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-14 border-b border-white/10 pb-14">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-14 border-b border-white/10 pb-12">
           
           {/* VISIT */}
           <div className="flex flex-col gap-3">
@@ -125,7 +126,7 @@ export default function Footer() {
             </a>
             
             {/* Quick Navigation Links */}
-            <nav className="flex flex-wrap gap-x-4 gap-y-1 pt-2 font-mono text-[10px] tracking-widest uppercase text-white/50">
+            <nav className="flex flex-wrap gap-x-4 gap-y-1.5 pt-2 font-mono text-[10px] tracking-widest uppercase text-white/50">
               {navigation.map((item) => (
                 <a
                   key={item.href}
@@ -141,9 +142,37 @@ export default function Footer() {
         </div>
 
         {/* ============================================================ */}
+        {/* LEGAL POLICIES STRIP: Cashfree Compliant Onboarding Links    */}
+        {/* ============================================================ */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-mono tracking-[0.14em] uppercase text-white/60">
+            {(legalLinks || [
+              { label: "Privacy Policy", href: "/privacy-policy" },
+              { label: "Terms & Conditions", href: "/terms-and-conditions" },
+              { label: "Cancellation & Refund Policy", href: "/cancellation-refund-policy" },
+            ]).map((link, idx, arr) => (
+              <span key={link.href} className="inline-flex items-center gap-6">
+                <Link
+                  href={link.href}
+                  className="hover:text-[#c9a87c] transition-colors"
+                >
+                  {link.label}
+                </Link>
+                {idx < arr.length - 1 && (
+                  <span className="text-white/20 hidden sm:inline" aria-hidden="true">•</span>
+                )}
+              </span>
+            ))}
+          </div>
+          <div className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#c9a87c]/75">
+            VERIFIED SALON POLICIES
+          </div>
+        </div>
+
+        {/* ============================================================ */}
         {/* FOOTER BOTTOM BAR: Restrained Strip                          */}
         {/* ============================================================ */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono tracking-[0.16em] uppercase text-white/40">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono tracking-[0.16em] uppercase text-white/40 pt-4 border-t border-white/5">
           <div>
             © {currentYear} {business.name}
           </div>
@@ -152,7 +181,7 @@ export default function Footer() {
             <span className="text-[#c9a87c]">PANIPAT, HARYANA</span>
             <span className="text-white/20">•</span>
             <a
-              href="#hero"
+              href="/#hero"
               className="text-white/60 hover:text-white transition-colors inline-flex items-center gap-1"
             >
               <span>BACK TO TOP</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId, useRef } from "react";
+import { useState, useEffect, useId, useRef, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   CreditCard,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { useBooking } from "@/context/BookingContext";
 import {
@@ -24,7 +25,6 @@ import {
   BOOKING_CATALOGUE,
   BOOKING_SERVICES,
   BOOKING_SLOTS,
-  DEMO_UNAVAILABLE_SLOTS,
   ONLINE_BOOKING_OFFER,
   PAYMENT_STATUS,
   getServicesForCategory,
@@ -32,7 +32,6 @@ import {
   isTuesday,
   isPastDate,
   formatDisplayDate,
-  processBookingAdvancePayment,
   buildCustomerConfirmationWhatsAppUrl,
 } from "@/data/bookingConfig";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -60,10 +59,41 @@ export default function BookingModal() {
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(1); // 1 = Details, 2 = Review & Pay Advance, 3 = Confirmed
   const [paymentStatus, setPaymentStatus] = useState(PAYMENT_STATUS.IDLE);
+  const [paymentErrorTitle, setPaymentErrorTitle] = useState("PAYMENT COULD NOT START");
+  const [paymentErrorMessage, setPaymentErrorMessage] = useState("");
   const [transactionRef, setTransactionRef] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Real-time Slot Availability State
+  const [slotsState, setSlotsState] = useState([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
   // Today string for min attribute in date picker
   const todayString = new Date().toISOString().split("T")[0];
+
+  // Fetch live slot availability for chosen date
+  const fetchAvailability = useCallback(async (dateStr) => {
+    if (!dateStr || isTuesday(dateStr) || isPastDate(dateStr)) {
+      setSlotsState([]);
+      return;
+    }
+
+    setIsLoadingSlots(true);
+    try {
+      const res = await fetch(`/api/bookings/availability?date=${encodeURIComponent(dateStr)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.slots)) {
+        setSlotsState(data.slots);
+      } else {
+        setSlotsState([]);
+      }
+    } catch (err) {
+      console.error("Failed to load availability:", err);
+      setSlotsState([]);
+    } finally {
+      setIsLoadingSlots(false);
+    }
+  }, []);
 
   // Sync pre-selected category/service & reset states when modal opens
   useEffect(() => {
@@ -76,9 +106,18 @@ export default function BookingModal() {
       setStep(1);
       setErrors({});
       setPaymentStatus(PAYMENT_STATUS.IDLE);
+      setPaymentErrorMessage("");
       setTransactionRef("");
+      setIsSubmitting(false);
     }
   }, [isOpen, bookingPayload]);
+
+  // Fetch availability when date changes
+  useEffect(() => {
+    if (formData.date) {
+      fetchAvailability(formData.date);
+    }
+  }, [formData.date, fetchAvailability]);
 
   // Lock document/body scroll and freeze background when modal is open
   useEffect(() => {
@@ -189,10 +228,11 @@ export default function BookingModal() {
       newErrors.name = "Please enter your full name";
     }
 
+    const cleanPhone = formData.phone.trim().replace(/\D/g, "");
     if (!formData.phone.trim()) {
       newErrors.phone = "Please enter your phone number";
-    } else if (formData.phone.trim().replace(/\D/g, "").length < 8) {
-      newErrors.phone = "Please enter a valid phone number (at least 8 digits)";
+    } else if (cleanPhone.length < 10) {
+      newErrors.phone = "Please enter a valid 10-digit Indian phone number";
     }
 
     if (!formData.category) {
@@ -234,25 +274,157 @@ export default function BookingModal() {
   const handleProceedToReview = (e) => {
     e.preventDefault();
     if (!validateStep1()) return;
+    setPaymentErrorMessage("");
+    setPaymentStatus(PAYMENT_STATUS.IDLE);
     setStep(2);
   };
 
-  // Payment Execution Step
+  // Real Production Payment Flow via Cashfree
   const handlePayAdvance = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
     setPaymentStatus(PAYMENT_STATUS.PROCESSING);
+    setPaymentErrorMessage("");
+    setPaymentErrorTitle("PAYMENT COULD NOT START");
 
     try {
-      const result = await processBookingAdvancePayment(formData);
+      console.log("[Cashfree Flow] 1. Requesting order creation for:", {
+        date: formData.date,
+        timeSlot: formData.timeSlot,
+        category: formData.category,
+      });
 
-      if (result.success) {
-        setTransactionRef(result.transactionId || "GE_ADV_CONFIRMED");
-        setPaymentStatus(PAYMENT_STATUS.SUCCESS);
-        setStep(3); // Move to Confirmed state
-      } else {
+      // 1. Create Booking & Temporary 10-min Slot Hold on Server
+      const createRes = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: formData.name,
+          phone: formData.phone,
+          serviceCategory: formData.category,
+          service: formData.service,
+          bookingDate: formData.date,
+          bookingTime: formData.timeSlot,
+          notes: formData.notes,
+        }),
+      });
+
+      const createData = await createRes.json();
+
+      console.log("[Cashfree Flow] 2. Server create order response:", {
+        httpStatus: createRes.status,
+        success: Boolean(createData?.success),
+        bookingCode: createData?.bookingCode,
+        cashfreeOrderId: createData?.cashfreeOrderId,
+        hasPaymentSessionId: Boolean(createData?.paymentSessionId),
+        error: createData?.error || null,
+        details: createData?.details || null,
+      });
+
+      if (!createRes.ok || !createData.success || !createData.paymentSessionId) {
+        const errorText =
+          createData.error ||
+          createData.details ||
+          "We couldn't start the secure payment session. Please try again.";
+        setPaymentErrorTitle("PAYMENT COULD NOT START");
+        setPaymentErrorMessage(errorText);
         setPaymentStatus(PAYMENT_STATUS.FAILED);
+        setIsSubmitting(false);
+
+        // If slot conflict, refresh availability
+        if (createData.code === "SLOT_UNAVAILABLE") {
+          fetchAvailability(formData.date);
+        }
+        return;
       }
-    } catch {
+
+      const { bookingCode, paymentSessionId, cashfreeOrderId } = createData;
+
+      // 2. Launch Official Cashfree Checkout Modal
+      const envMode = (process.env.NEXT_PUBLIC_CASHFREE_ENV || "sandbox").toLowerCase();
+      console.log("[Cashfree Flow] 3. Initializing Cashfree SDK with mode:", envMode);
+
+      let cashfree;
+      try {
+        const { load } = await import("@cashfreepayments/cashfree-js");
+        cashfree = await load({
+          mode: envMode === "production" ? "production" : "sandbox",
+        });
+      } catch (loadErr) {
+        console.error("[Cashfree Flow] SDK Load Exception:", loadErr);
+        setPaymentErrorTitle("PAYMENT COULD NOT START");
+        setPaymentErrorMessage(
+          "Unable to load Cashfree payment gateway script. Please check your internet connection or ad blocker."
+        );
+        setPaymentStatus(PAYMENT_STATUS.FAILED);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!cashfree || typeof cashfree.checkout !== "function") {
+        console.error("[Cashfree Flow] Cashfree JS SDK object unavailable.");
+        setPaymentErrorTitle("PAYMENT COULD NOT START");
+        setPaymentErrorMessage("Payment gateway initialization failed. Please try again.");
+        setPaymentStatus(PAYMENT_STATUS.FAILED);
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log("[Cashfree Flow] 4. Launching Cashfree checkout for session:", {
+        bookingCode,
+        cashfreeOrderId,
+        hasSession: Boolean(paymentSessionId),
+      });
+
+      try {
+        await cashfree.checkout({
+          paymentSessionId,
+          redirectTarget: "_modal",
+        });
+        console.log("[Cashfree Flow] 5. Modal checkout interaction concluded.");
+      } catch (sdkErr) {
+        console.warn("[Cashfree Flow] Modal checkout notice:", sdkErr);
+      }
+
+      // 3. Authoritative Verification via Backend
+      console.log("[Cashfree Flow] 6. Verifying payment status on server...");
+      const verifyRes = await fetch("/api/bookings/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingCode,
+          cashfreeOrderId,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      console.log("[Cashfree Flow] 7. Verification result:", {
+        isConfirmed: Boolean(verifyData?.isConfirmed),
+        bookingStatus: verifyData?.booking?.bookingStatus,
+        paymentStatus: verifyData?.booking?.paymentStatus,
+      });
+
+      if (verifyData.isConfirmed || verifyData?.booking?.bookingStatus === "CONFIRMED") {
+        setTransactionRef(bookingCode);
+        setPaymentStatus(PAYMENT_STATUS.SUCCESS);
+        setStep(3); // Transition to Confirmed state
+      } else {
+        setPaymentErrorTitle("PAYMENT NOT COMPLETED");
+        setPaymentStatus(PAYMENT_STATUS.FAILED);
+        setPaymentErrorMessage(
+          "Payment was not completed. Your appointment has not been confirmed."
+        );
+      }
+    } catch (err) {
+      console.error("[Cashfree Flow] Unhandled payment execution error:", err);
+      setPaymentErrorTitle("PAYMENT COULD NOT START");
       setPaymentStatus(PAYMENT_STATUS.FAILED);
+      setPaymentErrorMessage(
+        err.message || "We couldn't start the secure payment session. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -624,21 +796,31 @@ export default function BookingModal() {
                     </div>
                   )}
 
-                  {/* Row 3: Selectable Time Slots Grid (Visual layout preserved; locked if Tuesday) */}
+                  {/* Row 3: Selectable Time Slots Grid (Live Server Availability) */}
                   <div className={`flex flex-col gap-2 pt-1 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-35 pointer-events-none select-none" : ""}`}>
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5">
                         <Clock className="w-3 h-3 text-[#c9a87c]" />
                         <span>Select Time Slot <span className="text-[#c9a87c]">*</span></span>
                       </label>
-                      <span className="text-[9px] font-mono text-[#c9a87c] uppercase">
-                        10:00 AM – 08:00 PM
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {isLoadingSlots && (
+                          <span className="text-[9px] font-mono text-[#c9a87c] flex items-center gap-1">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            <span>Checking slots...</span>
+                          </span>
+                        )}
+                        <span className="text-[9px] font-mono text-[#c9a87c] uppercase">
+                          10:00 AM – 08:00 PM
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {BOOKING_SLOTS.map((slot) => {
-                        const isUnavailable = DEMO_UNAVAILABLE_SLOTS.includes(slot);
+                        const serverSlotInfo = slotsState.find((s) => s.slot === slot);
+                        const isUnavailable = serverSlotInfo ? !serverSlotInfo.available : false;
+                        const slotBadge = serverSlotInfo?.status === "HELD" ? "Reserved" : "Booked";
                         const isSelected = formData.timeSlot === slot;
 
                         return (
@@ -660,7 +842,7 @@ export default function BookingModal() {
                             <span>{slot}</span>
                             {isUnavailable && !isSelectedDateTuesday && (
                               <span className="text-[7px] font-mono uppercase tracking-widest text-white/40 not-line-through">
-                                Booked
+                                {slotBadge}
                               </span>
                             )}
                           </button>
@@ -731,6 +913,21 @@ export default function BookingModal() {
                       Review &amp; Pay ₹{BOOKING_ADVANCE} Advance
                     </h3>
                   </div>
+
+                  {/* Payment Failure Notice */}
+                  {paymentStatus === PAYMENT_STATUS.FAILED && (
+                    <div className="bg-[#241310] border border-[#df9b8a]/50 p-4 space-y-2 text-left shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
+                      <div className="flex items-center gap-2.5 text-[#df9b8a]">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span className="font-mono text-xs uppercase tracking-widest font-bold">
+                          {paymentErrorTitle}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#eae6df]/90 font-sans leading-relaxed">
+                        {paymentErrorMessage || "Your appointment has not been confirmed. The ₹99 advance was not completed."}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Summary Details Card */}
                   <div className="bg-[#0c0b0a] border border-white/12 p-4 sm:p-5 space-y-3">
@@ -809,17 +1006,23 @@ export default function BookingModal() {
                   <div className="space-y-3 pt-1">
                     <button
                       type="button"
-                      disabled={paymentStatus === PAYMENT_STATUS.PROCESSING}
+                      disabled={paymentStatus === PAYMENT_STATUS.PROCESSING || isSubmitting}
                       onClick={handlePayAdvance}
                       className="group relative inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-xs font-bold uppercase tracking-[0.16em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] hover:shadow-[0_4px_30px_rgba(201,168,124,0.35)] min-h-[50px] w-full text-center cursor-pointer disabled:opacity-75"
                       style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
                     >
                       <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
                       <span className="relative z-10 flex items-center justify-center gap-2 font-bold text-[#0c0b0a]">
-                        {paymentStatus === PAYMENT_STATUS.PROCESSING ? (
+                        {paymentStatus === PAYMENT_STATUS.PROCESSING || isSubmitting ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-[#0c0b0a]" />
-                            <span>PROCESSING ADVANCE...</span>
+                            <span>INITIALIZING CASHFREE CHECKOUT...</span>
+                          </>
+                        ) : paymentStatus === PAYMENT_STATUS.FAILED ? (
+                          <>
+                            <RotateCcw className="w-4 h-4 text-[#0c0b0a]" />
+                            <span>TRY PAYMENT AGAIN (₹{BOOKING_ADVANCE})</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                           </>
                         ) : (
                           <>
@@ -831,20 +1034,24 @@ export default function BookingModal() {
                       </span>
                     </button>
 
-                    {paymentStatus !== PAYMENT_STATUS.PROCESSING && (
+                    {paymentStatus !== PAYMENT_STATUS.PROCESSING && !isSubmitting && (
                       <button
                         type="button"
-                        onClick={() => setStep(1)}
+                        onClick={() => {
+                          setStep(1);
+                          setPaymentStatus(PAYMENT_STATUS.IDLE);
+                          setPaymentErrorMessage("");
+                        }}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-mono uppercase tracking-[0.16em] text-[#eae6df]/75 hover:text-white border border-white/10 hover:border-white/30 transition-colors w-full cursor-pointer"
                       >
                         <ArrowLeft className="w-3 h-3" />
-                        <span>Edit Details</span>
+                        <span>{paymentStatus === PAYMENT_STATUS.FAILED ? "Choose Another Slot / Date" : "Edit Details"}</span>
                       </button>
                     )}
 
                     <div className="flex items-center justify-center gap-2 text-[10.5px] text-[#eae6df]/60 font-mono tracking-tight pt-1">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#c9a87c]" />
-                      <span>Encrypted &amp; Secure Salon Booking Checkout</span>
+                      <span>Encrypted &amp; Secure Cashfree Payment Gateway Checkout</span>
                     </div>
                   </div>
 
@@ -933,9 +1140,9 @@ export default function BookingModal() {
                       </div>
                       <div className="text-right">
                         <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Ref No.
+                          Booking Code
                         </span>
-                        <span className="font-mono text-[10px] text-[#eae6df]/80">
+                        <span className="font-mono text-xs font-bold text-[#c9a87c]">
                           {transactionRef}
                         </span>
                       </div>

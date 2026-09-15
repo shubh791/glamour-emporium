@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+model Booking {
+  id                String        @id @default(cuid())
+  bookingCode       String        @unique
+  customerName      String
+  phone             String
+  serviceCategory   String
+  service           String?
+  bookingDate       String
+  bookingTime       String
+  notes             String?
+  amount            Int           @default(99)
+  currency          String        @default("INR")
+  cashfreeOrderId   String?       @unique
+  cashfreePaymentId String?
+  paymentStatus     PaymentStatus @default(PENDING)
+  bookingStatus     BookingStatus @default(PENDING_PAYMENT)
+  slotHoldExpiresAt DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([bookingDate, bookingTime, bookingStatus])
+  @@index([cashfreeOrderId])
+  @@index([bookingCode])
+}

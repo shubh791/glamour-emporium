@@ -48,11 +48,16 @@ export const siteData = {
     },
   },
   navigation: [
-    { label: "Home", href: "#hero" },
-    { label: "Services", href: "#services" },
-    { label: "Experience", href: "#experience" },
-    { label: "Gallery", href: "#showcase" },
-    { label: "Contact", href: "#contact" },
+    { label: "Home", href: "/#hero" },
+    { label: "Services", href: "/#services" },
+    { label: "Experience", href: "/#experience" },
+    { label: "Gallery", href: "/#showcase" },
+    { label: "Contact", href: "/#contact" },
+  ],
+  legalLinks: [
+    { label: "Privacy Policy", href: "/privacy-policy" },
+    { label: "Terms & Conditions", href: "/terms-and-conditions" },
+    { label: "Cancellation & Refund Policy", href: "/cancellation-refund-policy" },
   ],
   booking: {
     ctaLabel: "Book your slot",
