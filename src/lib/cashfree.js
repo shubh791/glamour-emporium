@@ -79,7 +79,6 @@ export async function createCashfreeOrder({
     },
     order_meta: {
       return_url: returnUrl || undefined,
-      payment_methods: "upi,cc,dc,nb,app",
     },
     order_note: "Glamour Emporium Appointment Booking Advance",
   };

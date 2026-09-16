@@ -7,7 +7,7 @@ import {
   isSlotAvailable,
   HOLD_DURATION_MINUTES,
 } from "@/lib/bookingService";
-import { createCashfreeOrder } from "@/lib/cashfree";
+import { createCashfreeOrder, getCashfreeConfig } from "@/lib/cashfree";
 import { isTuesday, isPastDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 export const dynamic = "force-dynamic";
@@ -174,9 +174,12 @@ export async function POST(request) {
       );
     }
 
+    const config = getCashfreeConfig();
+
     console.log("[Create Booking Route] Cashfree session ready:", {
       bookingCode: booking.bookingCode,
       cashfreeOrderId,
+      environment: config.env,
       hasPaymentSessionId: Boolean(cashfreeOrderResult.paymentSessionId),
     });
 
@@ -185,6 +188,7 @@ export async function POST(request) {
       bookingCode: booking.bookingCode,
       cashfreeOrderId,
       paymentSessionId: cashfreeOrderResult.paymentSessionId,
+      environment: config.env,
       amount,
       currency: "INR",
       slotHoldExpiresAt: slotHoldExpiresAt.toISOString(),

@@ -342,7 +342,11 @@ export default function BookingModal() {
       const { bookingCode, paymentSessionId, cashfreeOrderId } = createData;
 
       // 2. Launch Official Cashfree Checkout Modal
-      const envMode = (process.env.NEXT_PUBLIC_CASHFREE_ENV || "sandbox").toLowerCase();
+      const envMode = (
+        createData.environment ||
+        process.env.NEXT_PUBLIC_CASHFREE_ENV ||
+        "sandbox"
+      ).toLowerCase();
       console.log("[Cashfree Flow] 3. Initializing Cashfree SDK with mode:", envMode);
 
       let cashfree;
@@ -374,15 +378,16 @@ export default function BookingModal() {
       console.log("[Cashfree Flow] 4. Launching Cashfree checkout for session:", {
         bookingCode,
         cashfreeOrderId,
+        mode: envMode,
         hasSession: Boolean(paymentSessionId),
       });
 
       try {
-        await cashfree.checkout({
+        const checkoutRes = await cashfree.checkout({
           paymentSessionId,
           redirectTarget: "_modal",
         });
-        console.log("[Cashfree Flow] 5. Modal checkout interaction concluded.");
+        console.log("[Cashfree Flow] 5. Modal checkout interaction concluded:", checkoutRes);
       } catch (sdkErr) {
         console.warn("[Cashfree Flow] Modal checkout notice:", sdkErr);
       }
