@@ -109,10 +109,10 @@ export default function PrivacyPolicyPage() {
             <span>04. PAYMENT PROCESSING &amp; FINANCIAL SECURITY</span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl text-[#f5f2eb] font-normal tracking-tight">
-            Secure Payment Gateway Terms
+            Secure Razorpay Payment Gateway Terms
           </h2>
           <p>
-            To confirm online appointment slots, an appointment booking advance of <strong className="text-[#f5f2eb]">₹99</strong> is required. All online transactions are routed through authorized, RBI-compliant third-party payment gateway providers (including Cashfree Payments).
+            To confirm online appointment slots, an appointment booking advance of <strong className="text-[#f5f2eb]">₹99</strong> is required. All online payment transactions are processed securely through authorized, RBI-compliant third-party payment gateway partner <strong className="text-[#f5f2eb]">Razorpay</strong> (Razorpay Software Private Limited).
           </p>
 
           <div className="p-5 sm:p-6 bg-[#c9a87c]/10 border border-[#c9a87c]/40 relative">
@@ -123,14 +123,14 @@ export default function PrivacyPolicyPage() {
                   Strict Payment Credentials Privacy
                 </h3>
                 <p className="text-xs sm:text-sm text-[#eae6df]/90 leading-relaxed">
-                  <strong className="text-[#f5f2eb]">Glamour Emporium does NOT collect, store, or have access to</strong> your credit/debit card numbers, CVV codes, card expiration dates, net banking passwords, UPI PINs, or sensitive financial credentials. All payment processing occurs entirely within the encrypted, PCI-DSS compliant infrastructure of our payment gateway partners.
+                  <strong className="text-[#f5f2eb]">Glamour Emporium does NOT collect, store, or have access to</strong> your credit/debit card numbers, CVV codes, card expiration dates, net banking passwords, UPI PINs, or sensitive banking credentials. All online payment processing is executed securely via Razorpay&apos;s encrypted, PCI-DSS Level 1 compliant infrastructure.
                 </p>
               </div>
             </div>
           </div>
 
           <p className="text-xs text-[#eae6df]/70">
-            We retain only transactional metadata (such as Payment Gateway Order ID, Payment ID, transaction timestamp, payment status, and booked amount) to verify and credit your appointment advance against your final salon bill.
+            We retain only non-sensitive transactional metadata (such as Razorpay Order ID, Razorpay Payment ID, transaction timestamp, payment status, and booked amount) to verify and credit your appointment advance against your final salon bill.
           </p>
         </section>
 
@@ -149,7 +149,7 @@ export default function PrivacyPolicyPage() {
             We share information solely with verified operational partners who assist in operating our website and delivering services:
           </p>
           <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm text-[#eae6df]/85">
-            <li>Authorized payment gateway processors (e.g., Cashfree Payments) for completing the ₹99 booking advance.</li>
+            <li>Authorized payment gateway processors (Razorpay Software Private Limited) for completing the ₹99 booking advance securely.</li>
             <li>Cloud database and hosting service providers hosting our website infrastructure.</li>
             <li>Transactional communication service providers (SMS, WhatsApp Business API) for booking notifications.</li>
             <li>Law enforcement or regulatory authorities only when strictly required by applicable Indian law.</li>

@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { fetchCashfreeOrder, fetchCashfreeOrderPayments } from "@/lib/cashfree";
+import {
+  verifyRazorpayPaymentSignature,
+  fetchRazorpayPayment,
+  fetchRazorpayOrder,
+} from "@/lib/razorpay";
 import { notifyConfirmedBooking } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   try {
-    const { bookingCode, cashfreeOrderId } = await request.json();
+    const body = await request.json();
+    const {
+      bookingCode,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+    } = body || {};
 
-    if (!bookingCode && !cashfreeOrderId) {
+    if (!bookingCode && !razorpayOrderId) {
       return NextResponse.json(
-        { error: "bookingCode or cashfreeOrderId is required" },
+        { error: "bookingCode or razorpayOrderId is required" },
         { status: 400 }
       );
     }
@@ -20,7 +30,7 @@ export async function POST(request) {
       where: {
         OR: [
           bookingCode ? { bookingCode } : undefined,
-          cashfreeOrderId ? { cashfreeOrderId } : undefined,
+          razorpayOrderId ? { razorpayOrderId } : undefined,
         ].filter(Boolean),
       },
     });
@@ -29,7 +39,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // If already confirmed in DB, return immediately
+    // 1. If already confirmed in DB, return immediately (idempotency)
     if (booking.bookingStatus === "CONFIRMED" && booking.paymentStatus === "SUCCESS") {
       return NextResponse.json({
         success: true,
@@ -38,47 +48,70 @@ export async function POST(request) {
       });
     }
 
-    // Verify order directly with Cashfree PG API as authoritative backup
-    if (booking.cashfreeOrderId) {
+    // 2. Cryptographic HMAC SHA256 Signature Verification
+    let isSignatureValid = false;
+    if (razorpayOrderId && razorpayPaymentId && razorpaySignature) {
+      isSignatureValid = verifyRazorpayPaymentSignature({
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature,
+      });
+    }
+
+    // 3. Direct Server API Fallback Check (if client signature wasn't provided or needed verification)
+    let isPaymentCaptured = isSignatureValid;
+    if (!isPaymentCaptured && razorpayPaymentId) {
       try {
-        const orderData = await fetchCashfreeOrder(booking.cashfreeOrderId);
-        const payments = await fetchCashfreeOrderPayments(booking.cashfreeOrderId);
-        const successPayment = payments.find((p) => p.payment_status === "SUCCESS");
-
-        if (orderData.order_status === "PAID" || successPayment) {
-          const paymentId = successPayment?.cf_payment_id
-            ? String(successPayment.cf_payment_id)
-            : null;
-
-          const updatedBooking = await prisma.booking.update({
-            where: { id: booking.id },
-            data: {
-              paymentStatus: "SUCCESS",
-              bookingStatus: "CONFIRMED",
-              cashfreePaymentId: paymentId || booking.cashfreePaymentId,
-            },
-          });
-
-          await notifyConfirmedBooking(updatedBooking);
-
-          return NextResponse.json({
-            success: true,
-            isConfirmed: true,
-            booking: updatedBooking,
-          });
+        const paymentData = await fetchRazorpayPayment(razorpayPaymentId);
+        if (
+          paymentData &&
+          paymentData.status === "captured" &&
+          paymentData.order_id === (razorpayOrderId || booking.razorpayOrderId)
+        ) {
+          isPaymentCaptured = true;
+          console.log(
+            `[Verify Route] Fallback API check confirmed payment ${razorpayPaymentId} for booking ${booking.bookingCode}`
+          );
         }
-      } catch (cfErr) {
-        console.warn("Cashfree verify check warning:", cfErr.message);
+      } catch (fetchErr) {
+        console.warn("[Verify Route] Razorpay direct check warning:", fetchErr.message);
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      isConfirmed: false,
-      booking,
-    });
+    if (isPaymentCaptured) {
+      const updatedBooking = await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          paymentStatus: "SUCCESS",
+          bookingStatus: "CONFIRMED",
+          razorpayPaymentId: razorpayPaymentId || booking.razorpayPaymentId,
+          razorpaySignature: razorpaySignature || booking.razorpaySignature,
+        },
+      });
+
+      console.log(`[Verify Route] Booking ${updatedBooking.bookingCode} CONFIRMED.`);
+
+      // Send transactional confirmations
+      await notifyConfirmedBooking(updatedBooking);
+
+      return NextResponse.json({
+        success: true,
+        isConfirmed: true,
+        booking: updatedBooking,
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        isConfirmed: false,
+        error: "Payment could not be verified. Signature mismatch or payment not captured.",
+        booking,
+      },
+      { status: 400 }
+    );
   } catch (err) {
-    console.error("Booking verification error:", err);
+    console.error("[Verify Route] Booking verification error:", err);
     return NextResponse.json(
       { error: "Verification error", details: err.message },
       { status: 500 }

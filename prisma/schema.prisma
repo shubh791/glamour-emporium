@@ -32,8 +32,9 @@ model Booking {
   notes             String?
   amount            Int           @default(99)
   currency          String        @default("INR")
-  cashfreeOrderId   String?       @unique
-  cashfreePaymentId String?
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
   paymentStatus     PaymentStatus @default(PENDING)
   bookingStatus     BookingStatus @default(PENDING_PAYMENT)
   slotHoldExpiresAt DateTime?
@@ -41,6 +42,6 @@ model Booking {
   updatedAt         DateTime      @updatedAt
 
   @@index([bookingDate, bookingTime, bookingStatus])
-  @@index([cashfreeOrderId])
+  @@index([razorpayOrderId])
   @@index([bookingCode])
 }

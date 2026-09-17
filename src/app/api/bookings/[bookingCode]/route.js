@@ -26,7 +26,7 @@ export async function GET(request, { params }) {
         currency: true,
         paymentStatus: true,
         bookingStatus: true,
-        cashfreePaymentId: true,
+        razorpayPaymentId: true,
         createdAt: true,
       },
     });

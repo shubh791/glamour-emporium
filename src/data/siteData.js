@@ -58,6 +58,7 @@ export const siteData = {
     { label: "Privacy Policy", href: "/privacy-policy" },
     { label: "Terms & Conditions", href: "/terms-and-conditions" },
     { label: "Cancellation & Refund Policy", href: "/cancellation-refund-policy" },
+    { label: "Contact Us", href: "/#contact" },
   ],
   booking: {
     ctaLabel: "Book your slot",

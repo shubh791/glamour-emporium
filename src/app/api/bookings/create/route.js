@@ -7,7 +7,7 @@ import {
   isSlotAvailable,
   HOLD_DURATION_MINUTES,
 } from "@/lib/bookingService";
-import { createCashfreeOrder, getCashfreeConfig } from "@/lib/cashfree";
+import { createRazorpayOrder, getRazorpayConfig } from "@/lib/razorpay";
 import { isTuesday, isPastDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +107,6 @@ export async function POST(request) {
     // 6. Calculate 10-minute hold expiration
     const slotHoldExpiresAt = new Date(Date.now() + HOLD_DURATION_MINUTES * 60 * 1000);
     const amount = BOOKING_ADVANCE; // Force 99 INR server-side
-    const cashfreeOrderId = `GE_ORD_${bookingCode}_${Date.now().toString(36).toUpperCase()}`;
 
     // 7. Create Temporary Booking Record in Database
     const booking = await prisma.booking.create({
@@ -122,7 +121,6 @@ export async function POST(request) {
         notes: notes ? notes.trim() : null,
         amount,
         currency: "INR",
-        cashfreeOrderId,
         paymentStatus: "PENDING",
         bookingStatus: "PENDING_PAYMENT",
         slotHoldExpiresAt,
@@ -131,34 +129,33 @@ export async function POST(request) {
 
     console.log("[Create Booking Route] Pending booking created in DB:", {
       bookingCode,
-      cashfreeOrderId,
       date: bookingDate,
       slot: bookingTime,
       phoneLast4: cleanedPhone.slice(-4),
     });
 
-    // 8. Create Cashfree Order
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const returnUrl = `${appUrl}/?order_id={order_id}`;
-
-    const cashfreeOrderResult = await createCashfreeOrder({
-      orderId: cashfreeOrderId,
+    // 8. Create Razorpay Order on Server
+    const razorpayOrderResult = await createRazorpayOrder({
+      bookingCode,
       orderAmount: amount,
       customerDetails: {
-        customerId: `cust_${cleanedPhone}`,
         customerName: customerName.trim(),
         customerPhone: cleanedPhone,
         customerEmail: "customer@glamouremporium.in",
       },
-      returnUrl,
+      notes: {
+        serviceCategory,
+        service: service || serviceCategory,
+        bookingDate,
+        bookingTime,
+      },
     });
 
-    if (!cashfreeOrderResult.success || !cashfreeOrderResult.paymentSessionId) {
-      console.error("[Create Booking Route] Cashfree order failed:", {
+    if (!razorpayOrderResult.success || !razorpayOrderResult.orderId) {
+      console.error("[Create Booking Route] Razorpay order creation failed:", {
         bookingCode: booking.bookingCode,
-        cashfreeOrderId,
-        error: cashfreeOrderResult.error,
-        code: cashfreeOrderResult.code,
+        error: razorpayOrderResult.error,
+        code: razorpayOrderResult.code,
       });
 
       // Delete temporary booking on immediate order creation failure
@@ -167,32 +164,38 @@ export async function POST(request) {
       return NextResponse.json(
         {
           error: "We couldn't start the secure payment session. Please try again.",
-          details: cashfreeOrderResult.error || "Failed to initialize Cashfree session",
-          code: cashfreeOrderResult.code || "PAYMENT_INIT_FAILED",
+          details: razorpayOrderResult.error || "Failed to initialize Razorpay order",
+          code: razorpayOrderResult.code || "PAYMENT_INIT_FAILED",
         },
         { status: 502 }
       );
     }
 
-    const config = getCashfreeConfig();
+    // Link Razorpay Order ID to the booking record
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        razorpayOrderId: razorpayOrderResult.orderId,
+      },
+    });
 
-    console.log("[Create Booking Route] Cashfree session ready:", {
+    console.log("[Create Booking Route] Razorpay order ready:", {
       bookingCode: booking.bookingCode,
-      cashfreeOrderId,
-      environment: config.env,
-      hasPaymentSessionId: Boolean(cashfreeOrderResult.paymentSessionId),
+      razorpayOrderId: razorpayOrderResult.orderId,
+      amountPaise: razorpayOrderResult.amount,
     });
 
     return NextResponse.json({
       success: true,
       bookingCode: booking.bookingCode,
-      cashfreeOrderId,
-      paymentSessionId: cashfreeOrderResult.paymentSessionId,
-      environment: config.env,
-      amount,
-      currency: "INR",
+      razorpayOrderId: razorpayOrderResult.orderId,
+      keyId: razorpayOrderResult.keyId,
+      amount: razorpayOrderResult.amount, // in paise (9900)
+      amountInRupees: amount, // ₹99
+      currency: razorpayOrderResult.currency || "INR",
       slotHoldExpiresAt: slotHoldExpiresAt.toISOString(),
       customerName: booking.customerName,
+      phone: booking.phone,
       service: booking.service || booking.serviceCategory,
       bookingDate: booking.bookingDate,
       bookingTime: booking.bookingTime,

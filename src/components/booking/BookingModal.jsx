@@ -37,6 +37,30 @@ import {
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      return resolve(false);
+    }
+    if (window.Razorpay) {
+      return resolve(true);
+    }
+    const existingScript = document.getElementById("razorpay-checkout-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(true));
+      existingScript.addEventListener("error", () => resolve(false));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "razorpay-checkout-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function BookingModal() {
   const { isOpen, bookingPayload, closeBooking } = useBooking();
   const prefersReducedMotion = useReducedMotion();
@@ -279,7 +303,7 @@ export default function BookingModal() {
     setStep(2);
   };
 
-  // Real Production Payment Flow via Cashfree
+  // Real Production Payment Flow via Razorpay Standard Checkout
   const handlePayAdvance = async () => {
     if (isSubmitting) return;
 
@@ -289,7 +313,7 @@ export default function BookingModal() {
     setPaymentErrorTitle("PAYMENT COULD NOT START");
 
     try {
-      console.log("[Cashfree Flow] 1. Requesting order creation for:", {
+      console.log("[Razorpay Flow] 1. Requesting order creation for:", {
         date: formData.date,
         timeSlot: formData.timeSlot,
         category: formData.category,
@@ -312,17 +336,16 @@ export default function BookingModal() {
 
       const createData = await createRes.json();
 
-      console.log("[Cashfree Flow] 2. Server create order response:", {
+      console.log("[Razorpay Flow] 2. Server create order response:", {
         httpStatus: createRes.status,
         success: Boolean(createData?.success),
         bookingCode: createData?.bookingCode,
-        cashfreeOrderId: createData?.cashfreeOrderId,
-        hasPaymentSessionId: Boolean(createData?.paymentSessionId),
+        razorpayOrderId: createData?.razorpayOrderId,
         error: createData?.error || null,
         details: createData?.details || null,
       });
 
-      if (!createRes.ok || !createData.success || !createData.paymentSessionId) {
+      if (!createRes.ok || !createData.success || !createData.razorpayOrderId) {
         const errorText =
           createData.error ||
           createData.details ||
@@ -339,96 +362,116 @@ export default function BookingModal() {
         return;
       }
 
-      const { bookingCode, paymentSessionId, cashfreeOrderId } = createData;
+      const { bookingCode, razorpayOrderId, keyId, amount, currency } = createData;
 
-      // 2. Launch Official Cashfree Checkout Modal
-      const envMode = (
-        createData.environment ||
-        process.env.NEXT_PUBLIC_CASHFREE_ENV ||
-        "sandbox"
-      ).toLowerCase();
-      console.log("[Cashfree Flow] 3. Initializing Cashfree SDK with mode:", envMode);
-
-      let cashfree;
-      try {
-        const { load } = await import("@cashfreepayments/cashfree-js");
-        cashfree = await load({
-          mode: envMode === "production" ? "production" : "sandbox",
-        });
-      } catch (loadErr) {
-        console.error("[Cashfree Flow] SDK Load Exception:", loadErr);
+      // 2. Load Official Razorpay Checkout Script
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || typeof window.Razorpay !== "function") {
+        console.error("[Razorpay Flow] Razorpay SDK could not be loaded.");
         setPaymentErrorTitle("PAYMENT COULD NOT START");
         setPaymentErrorMessage(
-          "Unable to load Cashfree payment gateway script. Please check your internet connection or ad blocker."
+          "Unable to load Razorpay payment gateway script. Please check your internet connection or ad blocker."
         );
         setPaymentStatus(PAYMENT_STATUS.FAILED);
         setIsSubmitting(false);
         return;
       }
 
-      if (!cashfree || typeof cashfree.checkout !== "function") {
-        console.error("[Cashfree Flow] Cashfree JS SDK object unavailable.");
-        setPaymentErrorTitle("PAYMENT COULD NOT START");
-        setPaymentErrorMessage("Payment gateway initialization failed. Please try again.");
-        setPaymentStatus(PAYMENT_STATUS.FAILED);
+      // 3. Launch Standard Razorpay Modal
+      const options = {
+        key: keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: amount || BOOKING_ADVANCE * 100,
+        currency: currency || "INR",
+        name: "Glamour Emporium",
+        description: `Appointment Advance (₹${BOOKING_ADVANCE})`,
+        image: "/images/logo/logo-mark.webp",
+        order_id: razorpayOrderId,
+        prefill: {
+          name: formData.name,
+          contact: formData.phone,
+        },
+        theme: {
+          color: "#c9a87c",
+          backdrop_color: "#0c0b0a",
+        },
+        modal: {
+          ondismiss: function () {
+            console.log("[Razorpay Flow] Checkout modal dismissed by customer.");
+            setIsSubmitting(false);
+            setPaymentStatus(PAYMENT_STATUS.FAILED);
+            setPaymentErrorTitle("PAYMENT NOT COMPLETED");
+            setPaymentErrorMessage(
+              "Checkout was closed before completing payment. Your appointment has not been confirmed."
+            );
+          },
+          escape: true,
+          backdropclose: false,
+        },
+        handler: async function (response) {
+          console.log("[Razorpay Flow] Payment completed by customer, verifying signature:", response);
+          setIsSubmitting(true);
+          setPaymentStatus(PAYMENT_STATUS.PROCESSING);
+
+          try {
+            const verifyRes = await fetch("/api/bookings/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                bookingCode,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              }),
+            });
+
+            const verifyData = await verifyRes.json();
+            console.log("[Razorpay Flow] Verification result:", verifyData);
+
+            if (verifyData.isConfirmed || verifyData?.booking?.bookingStatus === "CONFIRMED") {
+              setTransactionRef(bookingCode);
+              setPaymentStatus(PAYMENT_STATUS.SUCCESS);
+              setStep(3); // Transition to Confirmed state
+            } else {
+              setPaymentErrorTitle("PAYMENT VERIFICATION FAILED");
+              setPaymentStatus(PAYMENT_STATUS.FAILED);
+              setPaymentErrorMessage(
+                verifyData.error || "Payment verification could not be completed. Please contact support."
+              );
+            }
+          } catch (verifyErr) {
+            console.error("[Razorpay Flow] Verification error:", verifyErr);
+            setPaymentErrorTitle("VERIFICATION ERROR");
+            setPaymentStatus(PAYMENT_STATUS.FAILED);
+            setPaymentErrorMessage(
+              "A network error occurred while confirming your payment. Please contact salon support with your payment receipt."
+            );
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on("payment.failed", function (response) {
+        console.error("[Razorpay Flow] Payment failed on gateway:", response.error);
         setIsSubmitting(false);
-        return;
-      }
-
-      console.log("[Cashfree Flow] 4. Launching Cashfree checkout for session:", {
-        bookingCode,
-        cashfreeOrderId,
-        mode: envMode,
-        hasSession: Boolean(paymentSessionId),
-      });
-
-      try {
-        const checkoutRes = await cashfree.checkout({
-          paymentSessionId,
-          redirectTarget: "_modal",
-        });
-        console.log("[Cashfree Flow] 5. Modal checkout interaction concluded:", checkoutRes);
-      } catch (sdkErr) {
-        console.warn("[Cashfree Flow] Modal checkout notice:", sdkErr);
-      }
-
-      // 3. Authoritative Verification via Backend
-      console.log("[Cashfree Flow] 6. Verifying payment status on server...");
-      const verifyRes = await fetch("/api/bookings/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingCode,
-          cashfreeOrderId,
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-      console.log("[Cashfree Flow] 7. Verification result:", {
-        isConfirmed: Boolean(verifyData?.isConfirmed),
-        bookingStatus: verifyData?.booking?.bookingStatus,
-        paymentStatus: verifyData?.booking?.paymentStatus,
-      });
-
-      if (verifyData.isConfirmed || verifyData?.booking?.bookingStatus === "CONFIRMED") {
-        setTransactionRef(bookingCode);
-        setPaymentStatus(PAYMENT_STATUS.SUCCESS);
-        setStep(3); // Transition to Confirmed state
-      } else {
-        setPaymentErrorTitle("PAYMENT NOT COMPLETED");
         setPaymentStatus(PAYMENT_STATUS.FAILED);
+        setPaymentErrorTitle("PAYMENT FAILED");
         setPaymentErrorMessage(
-          "Payment was not completed. Your appointment has not been confirmed."
+          response.error?.description ||
+            "Payment was declined by your bank or UPI app. Please try again with a different payment method."
         );
-      }
+      });
+
+      rzp.open();
     } catch (err) {
-      console.error("[Cashfree Flow] Unhandled payment execution error:", err);
+      console.error("[Razorpay Flow] Unhandled payment execution error:", err);
       setPaymentErrorTitle("PAYMENT COULD NOT START");
       setPaymentStatus(PAYMENT_STATUS.FAILED);
       setPaymentErrorMessage(
         err.message || "We couldn't start the secure payment session. Please try again."
       );
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -1021,7 +1064,7 @@ export default function BookingModal() {
                         {paymentStatus === PAYMENT_STATUS.PROCESSING || isSubmitting ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-[#0c0b0a]" />
-                            <span>INITIALIZING CASHFREE CHECKOUT...</span>
+                            <span>INITIALIZING SECURE CHECKOUT...</span>
                           </>
                         ) : paymentStatus === PAYMENT_STATUS.FAILED ? (
                           <>
@@ -1056,7 +1099,7 @@ export default function BookingModal() {
 
                     <div className="flex items-center justify-center gap-2 text-[10.5px] text-[#eae6df]/60 font-mono tracking-tight pt-1">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#c9a87c]" />
-                      <span>Encrypted &amp; Secure Cashfree Payment Gateway Checkout</span>
+                      <span>Encrypted &amp; Secure Razorpay Payment Gateway Checkout</span>
                     </div>
                   </div>
 

@@ -167,7 +167,7 @@ export default function TermsAndConditionsPage() {
           </ul>
         </section>
 
-        {/* Section 6: Payment Processing via Cashfree */}
+        {/* Section 6: Payment Processing via Razorpay */}
         <section className="space-y-4 pt-8 border-t border-white/10">
           <div className="flex items-center gap-2 text-xs font-mono tracking-[0.2em] uppercase text-[#c9a87c]">
             <span>06. PAYMENT GATEWAY INTEGRATION</span>
@@ -176,7 +176,7 @@ export default function TermsAndConditionsPage() {
             Third-Party Payment Infrastructure
           </h2>
           <p>
-            All online payments on this website are facilitated through authorized third-party payment gateway providers (including Cashfree Payments). By completing a transaction, you agree to abide by the applicable terms and policies of the payment gateway.
+            All online payments on this website are facilitated through authorized third-party payment gateway partner <strong className="text-[#f5f2eb]">Razorpay</strong> (Razorpay Software Private Limited). By completing a transaction, you agree to abide by the applicable terms and policies of the payment gateway.
           </p>
           <p className="text-xs text-[#eae6df]/75">
             Glamour Emporium is not responsible for transaction failures resulting from incorrect card/UPI information, insufficient bank funds, or banking network downtime.

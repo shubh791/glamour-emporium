@@ -142,7 +142,7 @@ export default function Footer() {
         </div>
 
         {/* ============================================================ */}
-        {/* LEGAL POLICIES STRIP: Cashfree Compliant Onboarding Links    */}
+        {/* LEGAL POLICIES STRIP: Razorpay Compliant Onboarding Links   */}
         {/* ============================================================ */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-mono tracking-[0.14em] uppercase text-white/60">
@@ -150,6 +150,7 @@ export default function Footer() {
               { label: "Privacy Policy", href: "/privacy-policy" },
               { label: "Terms & Conditions", href: "/terms-and-conditions" },
               { label: "Cancellation & Refund Policy", href: "/cancellation-refund-policy" },
+              { label: "Contact Us", href: "/#contact" },
             ]).map((link, idx, arr) => (
               <span key={link.href} className="inline-flex items-center gap-6">
                 <Link

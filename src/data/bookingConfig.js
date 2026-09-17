@@ -346,11 +346,11 @@ export const PAYMENT_STATUS = {
 /**
  * Frontend Payment Gateway Simulation Adapter
  * 
- * Prepares the integration boundary for payment gateways (e.g. Razorpay / Cashfree).
+ * Prepares the integration boundary for Razorpay Standard Checkout payment gateway.
  * 
  * ARCHITECTURE NOTE:
- * - Production integration will trigger server order creation (POST /api/bookings/create-payment)
- *   using the salon's verified merchant keys so settlements transfer directly to Glamour Emporium.
+ * - Production integration triggers server order creation (POST /api/bookings/create)
+ *   using the salon's verified Razorpay merchant keys so settlements transfer directly to Glamour Emporium.
  * - This frontend mock demonstrates the full state transitions (IDLE -> PROCESSING -> SUCCESS).
  * 
  * @param {Object} bookingDetails
