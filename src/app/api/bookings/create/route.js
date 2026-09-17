@@ -68,7 +68,7 @@ export async function POST(request) {
     // 2. Enforce Tuesday Closure Rule (Server-side defense)
     if (isTuesday(bookingDate)) {
       return NextResponse.json(
-        { error: "Glamour Emporium is closed every Tuesday. Please choose another date." },
+        { error: "Salon is closed every Tuesday. Please select another date." },
         { status: 400 }
       );
     }
@@ -92,12 +92,12 @@ export async function POST(request) {
       );
     }
 
-    // 5. Check Slot Availability in Database
+    // 5. Check Slot Availability in Database (Capacity < 3)
     const available = await isSlotAvailable(bookingDate, bookingTime);
     if (!available) {
       return NextResponse.json(
         {
-          error: "This time slot is already booked. Please choose another slot.",
+          error: "This time slot is already fully booked. Please choose another slot.",
           code: "SLOT_UNAVAILABLE",
         },
         { status: 409 }

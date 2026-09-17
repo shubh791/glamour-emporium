@@ -170,19 +170,37 @@ export function getServicesForCategory(categoryName = "") {
   return cat ? cat.services : [];
 }
 
-// Available Time Slots (Editable frontend config — ready for server availability sync)
+// Slot capacity: 3 appointments per time slot
+export const SLOT_CAPACITY = 3;
+
+// Available Time Slots: 9:30 AM to 10:00 PM at 30-minute intervals (26 slots)
 export const BOOKING_SLOTS = [
+  "09:30 AM",
   "10:00 AM",
+  "10:30 AM",
   "11:00 AM",
+  "11:30 AM",
   "12:00 PM",
+  "12:30 PM",
   "01:00 PM",
+  "01:30 PM",
   "02:00 PM",
+  "02:30 PM",
   "03:00 PM",
+  "03:30 PM",
   "04:00 PM",
+  "04:30 PM",
   "05:00 PM",
+  "05:30 PM",
   "06:00 PM",
+  "06:30 PM",
   "07:00 PM",
+  "07:30 PM",
   "08:00 PM",
+  "08:30 PM",
+  "09:00 PM",
+  "09:30 PM",
+  "10:00 PM",
 ];
 
 // Mock unavailable slots for frontend demonstration

@@ -291,7 +291,7 @@ export default function BookingModal() {
     if (!formData.date) {
       newErrors.date = "Please select a preferred date";
     } else if (isSelectedDateTuesday) {
-      newErrors.date = "Glamour Emporium is closed on Tuesdays";
+      newErrors.date = "Salon is closed every Tuesday. Please select another date.";
     } else if (isSelectedDatePast) {
       newErrors.date = "Please select today or a future date";
     }
@@ -909,8 +909,7 @@ export default function BookingModal() {
                             CLOSED ON TUESDAYS
                           </span>
                           <p className="text-xs text-[#eae6df]/90 font-sans leading-relaxed">
-                            Glamour Emporium is closed every Tuesday.<br className="hidden sm:inline" />
-                            Please choose another date to continue your booking.
+                            Salon is closed every Tuesday. Please select another date.
                           </p>
                         </div>
                       </div>
@@ -925,14 +924,22 @@ export default function BookingModal() {
                     </div>
                   )}
 
-                  {/* Row 4: Selectable Time Slots Grid (Dynamic Asia/Kolkata filtering with 15-min buffer) */}
+                  {/* Row 4: Selectable Time Slots Grid (Dynamic Asia/Kolkata filtering with 15-min buffer & 3-capacity tracking) */}
                   {(() => {
                     const isSelectedDateToday = formData.date === todayKolkataString;
                     const visibleSlots = BOOKING_SLOTS.filter((slot) => {
                       if (!formData.date) return true;
                       return isSlotAvailableTimeWise(formData.date, slot, 15);
                     });
-                    const hasNoSlotsRemainingToday = isSelectedDateToday && visibleSlots.length === 0;
+                    const allVisibleSlotsFull =
+                      slotsState.length > 0 &&
+                      visibleSlots.length > 0 &&
+                      visibleSlots.every((slot) => {
+                        const s = slotsState.find((x) => x.slot === slot);
+                        return s && !s.available;
+                      });
+                    const hasNoSlotsRemainingToday =
+                      isSelectedDateToday && (visibleSlots.length === 0 || allVisibleSlotsFull);
 
                     return (
                       <div className={`flex flex-col gap-2 pt-1 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-35 pointer-events-none select-none" : ""}`}>
@@ -949,9 +956,14 @@ export default function BookingModal() {
                               </span>
                             )}
                             <span className="text-[9px] font-mono text-[#c9a87c] uppercase">
-                              10:00 AM – 08:00 PM
+                              9:30 AM – 10:00 PM
                             </span>
                           </div>
+                        </div>
+
+                        {/* Capacity Helper Legend */}
+                        <div className="flex items-center justify-between text-[9.5px] font-mono text-[#eae6df]/60 pb-0.5">
+                          <span>Up to 3 appointments can be booked per time slot.</span>
                         </div>
 
                         {hasNoSlotsRemainingToday ? (
@@ -960,15 +972,23 @@ export default function BookingModal() {
                               No slots available today. Please select another date.
                             </p>
                             <p className="text-[11px] text-[#eae6df]/70 font-sans">
-                              All booking slots for today have already passed our 15-minute preparation buffer.
+                              {visibleSlots.length === 0
+                                ? "All booking slots for today have already passed our 15-minute preparation buffer."
+                                : "All remaining slots for today are fully booked. Please select another date."}
                             </p>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                             {visibleSlots.map((slot) => {
                               const serverSlotInfo = slotsState.find((s) => s.slot === slot);
+                              const spotsLeft = serverSlotInfo
+                                ? typeof serverSlotInfo.spotsLeft === "number"
+                                  ? serverSlotInfo.spotsLeft
+                                  : serverSlotInfo.available
+                                  ? 3
+                                  : 0
+                                : 3;
                               const isUnavailable = serverSlotInfo ? !serverSlotInfo.available : false;
-                              const slotBadge = serverSlotInfo?.status === "HELD" ? "Reserved" : "Booked";
                               const isSelected = formData.timeSlot === slot;
 
                               return (
@@ -977,22 +997,32 @@ export default function BookingModal() {
                                   type="button"
                                   disabled={isSelectedDateTuesday || isUnavailable}
                                   onClick={() => handleChange("timeSlot", slot)}
-                                  className={`relative px-2.5 py-2 text-xs font-mono tracking-wider transition-all duration-200 border text-center flex flex-col items-center justify-center min-h-[42px] ${
+                                  className={`relative px-2 py-2 text-center flex flex-col items-center justify-center min-h-[46px] border transition-all duration-200 ${
                                     isSelectedDateTuesday
                                       ? "bg-white/[0.02] border-white/10 text-white/40 cursor-not-allowed"
                                       : isUnavailable
-                                      ? "bg-white/[0.02] border-white/5 text-white/30 cursor-not-allowed line-through"
+                                      ? "bg-white/[0.02] border-white/5 text-white/30 cursor-not-allowed line-through opacity-60"
                                       : isSelected
                                       ? "bg-[#c9a87c] border-[#c9a87c] text-[#0c0b0a] font-bold shadow-[0_2px_10px_rgba(201,168,124,0.3)]"
                                       : "bg-[#0c0b0a]/70 border-white/15 text-[#eae6df] hover:border-[#c9a87c]/70 hover:text-white cursor-pointer"
                                   }`}
                                 >
-                                  <span>{slot}</span>
-                                  {isUnavailable && !isSelectedDateTuesday && (
-                                    <span className="text-[7px] font-mono uppercase tracking-widest text-white/40 not-line-through">
-                                      {slotBadge}
-                                    </span>
-                                  )}
+                                  <span className={`text-xs font-mono tracking-tight sm:tracking-normal ${isSelected ? "font-bold text-[#0c0b0a]" : ""}`}>
+                                    {slot}
+                                  </span>
+                                  <span
+                                    className={`text-[8.5px] font-mono tracking-wider uppercase mt-0.5 leading-none not-line-through ${
+                                      isSelected
+                                        ? "text-[#0c0b0a]/90 font-semibold"
+                                        : isUnavailable
+                                        ? "text-[#df9b8a]/80 font-medium"
+                                        : spotsLeft === 1
+                                        ? "text-[#c9a87c] font-medium"
+                                        : "text-[#eae6df]/55"
+                                    }`}
+                                  >
+                                    {isUnavailable ? "Fully booked" : `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} left`}
+                                  </span>
                                 </button>
                               );
                             })}

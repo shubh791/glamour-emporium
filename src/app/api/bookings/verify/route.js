@@ -6,6 +6,7 @@ import {
   getRazorpayConfig,
 } from "@/lib/razorpay";
 import { generateBookingCode, sanitizePhone } from "@/lib/bookingService";
+import { SLOT_CAPACITY } from "@/data/bookingConfig";
 import { notifyConfirmedBooking } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
@@ -120,6 +121,29 @@ export async function POST(request) {
         });
       }
 
+      // Check slot capacity before confirming
+      const targetDate = booking.bookingDate || bookingDate;
+      const targetTime = booking.bookingTime || bookingTime;
+      const confirmedCount = await prisma.booking.count({
+        where: {
+          bookingDate: targetDate,
+          bookingTime: targetTime,
+          bookingStatus: "CONFIRMED",
+        },
+      });
+
+      if (confirmedCount >= SLOT_CAPACITY) {
+        console.warn(`[Verify Route] Slot ${targetDate} ${targetTime} is full (${confirmedCount}/${SLOT_CAPACITY})!`);
+        return NextResponse.json(
+          {
+            success: false,
+            isConfirmed: false,
+            error: "Sorry, this time slot was just filled. Please choose another slot.",
+          },
+          { status: 409 }
+        );
+      }
+
       // Update to confirmed
       booking = await prisma.booking.update({
         where: { id: booking.id },
@@ -132,6 +156,29 @@ export async function POST(request) {
         },
       });
     } else {
+      // Check slot capacity before creating confirmed booking
+      const targetDate = bookingDate || new Date().toISOString().split("T")[0];
+      const targetTime = bookingTime || "10:00 AM";
+      const confirmedCount = await prisma.booking.count({
+        where: {
+          bookingDate: targetDate,
+          bookingTime: targetTime,
+          bookingStatus: "CONFIRMED",
+        },
+      });
+
+      if (confirmedCount >= SLOT_CAPACITY) {
+        console.warn(`[Verify Route] Slot ${targetDate} ${targetTime} is full (${confirmedCount}/${SLOT_CAPACITY})!`);
+        return NextResponse.json(
+          {
+            success: false,
+            isConfirmed: false,
+            error: "Sorry, this time slot was just filled. Please choose another slot.",
+          },
+          { status: 409 }
+        );
+      }
+
       // 4. Create Confirmed Booking in Database ONLY AFTER verified payment
       const finalBookingCode = bookingCode || generateBookingCode();
       const cleanedPhone = sanitizePhone(phone);
@@ -143,8 +190,8 @@ export async function POST(request) {
           phone: cleanedPhone,
           serviceCategory: serviceCategory || "Hair & Styling",
           service: service || null,
-          bookingDate: bookingDate || new Date().toISOString().split("T")[0],
-          bookingTime: bookingTime || "10:00 AM",
+          bookingDate: targetDate,
+          bookingTime: targetTime,
           notes: notes ? String(notes).trim() : null,
           amount: 99,
           currency: "INR",

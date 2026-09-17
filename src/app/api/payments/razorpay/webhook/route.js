@@ -117,7 +117,7 @@ export async function POST(request) {
 
     // 5. Handle Payment Failure Events
     const isFailed = event === "payment.failed" || paymentEntity?.status === "failed";
-    if (isFailed && booking.bookingStatus === "PENDING_PAYMENT") {
+    if (isFailed && booking && booking.bookingStatus === "PENDING_PAYMENT") {
       await prisma.booking.update({
         where: { id: booking.id },
         data: {

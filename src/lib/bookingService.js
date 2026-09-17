@@ -4,6 +4,7 @@ import {
   isPastDate,
   BOOKING_SLOTS,
   BOOKING_ADVANCE,
+  SLOT_CAPACITY,
   getTodayKolkataString,
   isSlotAvailableTimeWise,
   sanitizePhone,
@@ -26,9 +27,9 @@ export function generateBookingCode() {
 }
 
 /**
- * Gets real-time availability for all slots on a given date
+ * Gets real-time availability for all slots on a given date (Capacity-aware: 3 spots per slot)
  * @param {string} dateString - YYYY-MM-DD
- * @returns {Promise<{isClosed: boolean, closedReason?: string, slots: Array<{slot: string, available: boolean, status: string}>}>}
+ * @returns {Promise<{isClosed: boolean, closedReason?: string, slots: Array<{slot: string, capacity: number, bookedCount: number, spotsLeft: number, available: boolean, status: string}>}>}
  */
 export async function getSlotAvailabilityForDate(dateString) {
   if (!dateString) {
@@ -38,9 +39,12 @@ export async function getSlotAvailabilityForDate(dateString) {
   if (isTuesday(dateString)) {
     return {
       isClosed: true,
-      closedReason: "Glamour Emporium is closed every Tuesday. Please choose another date.",
+      closedReason: "Salon is closed every Tuesday. Please select another date.",
       slots: BOOKING_SLOTS.map((slot) => ({
         slot,
+        capacity: SLOT_CAPACITY,
+        bookedCount: 0,
+        spotsLeft: 0,
         available: false,
         status: "CLOSED",
       })),
@@ -53,6 +57,9 @@ export async function getSlotAvailabilityForDate(dateString) {
       closedReason: "Please select today or a future date.",
       slots: BOOKING_SLOTS.map((slot) => ({
         slot,
+        capacity: SLOT_CAPACITY,
+        bookedCount: 0,
+        spotsLeft: 0,
         available: false,
         status: "PAST_DATE",
       })),
@@ -72,37 +79,54 @@ export async function getSlotAvailabilityForDate(dateString) {
       },
       select: {
         bookingTime: true,
-        bookingStatus: true,
       },
     });
   } catch (dbErr) {
     console.warn("[BookingService] DB availability query notice:", dbErr.message);
   }
 
-  const bookedSlotSet = new Set(confirmedBookings.map((b) => b.bookingTime));
+  // Count confirmed bookings per slot
+  const bookingCountMap = {};
+  for (const b of confirmedBookings) {
+    if (b.bookingTime) {
+      bookingCountMap[b.bookingTime] = (bookingCountMap[b.bookingTime] || 0) + 1;
+    }
+  }
 
   const slots = BOOKING_SLOTS.map((slot) => {
+    const bookedCount = bookingCountMap[slot] || 0;
+    const spotsLeft = Math.max(0, SLOT_CAPACITY - bookedCount);
+
     // 1. Check if the slot start time has already passed or is within 15-min buffer for today
     if (isSelectedDateToday && !isSlotAvailableTimeWise(dateString, slot, 15)) {
       return {
         slot,
+        capacity: SLOT_CAPACITY,
+        bookedCount,
+        spotsLeft: 0,
         available: false,
         status: "PAST_SLOT",
       };
     }
 
-    // 2. Check if the slot is already booked in database
-    if (bookedSlotSet.has(slot)) {
+    // 2. Check if the slot is fully booked (capacity of 3 reached)
+    if (spotsLeft <= 0) {
       return {
         slot,
+        capacity: SLOT_CAPACITY,
+        bookedCount,
+        spotsLeft: 0,
         available: false,
-        status: "BOOKED",
+        status: "FULLY_BOOKED",
       };
     }
 
     // 3. Slot is available
     return {
       slot,
+      capacity: SLOT_CAPACITY,
+      bookedCount,
+      spotsLeft,
       available: true,
       status: "AVAILABLE",
     };
@@ -115,7 +139,7 @@ export async function getSlotAvailabilityForDate(dateString) {
 }
 
 /**
- * Checks if a specific date + time slot is available for booking
+ * Checks if a specific date + time slot is available for booking (Capacity < 3)
  * @param {string} dateString
  * @param {string} timeSlot
  * @returns {Promise<boolean>}
@@ -131,7 +155,7 @@ export async function isSlotAvailable(dateString, timeSlot) {
   }
 
   try {
-    const conflict = await prisma.booking.findFirst({
+    const confirmedCount = await prisma.booking.count({
       where: {
         bookingDate: dateString,
         bookingTime: timeSlot,
@@ -139,7 +163,7 @@ export async function isSlotAvailable(dateString, timeSlot) {
       },
     });
 
-    return !conflict;
+    return confirmedCount < SLOT_CAPACITY;
   } catch (err) {
     console.error("[BookingService] isSlotAvailable error:", err);
     return true; // allow proceeding to payment if read fails transiently
