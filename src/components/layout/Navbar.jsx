@@ -7,9 +7,8 @@ import { ArrowUpRight, Menu, X, CalendarDays } from "lucide-react";
 import { siteData } from "@/data/siteData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useBooking } from "@/context/BookingContext";
-import BrandMark from "@/components/ui/BrandMark";
 import InstagramIcon from "@/components/ui/InstagramIcon";
-import { BookingPromoDesktop, BookingPromoMobile } from "@/components/ui/BookingPromoStrip";
+import { BookingPromoDesktop, BookingPromoMobileDrawer } from "@/components/ui/BookingPromoStrip";
 
 const PROMO_STORAGE_KEY = "ge_promo_dismissed_until";
 
@@ -224,12 +223,6 @@ export default function Navbar() {
           </div>
 
         </div>
-
-        {/* Mobile Compact 1-line Dismissible Offer Strip */}
-        <BookingPromoMobile
-          showPromo={showPromo}
-          onDismiss={handleDismissPromo}
-        />
       </motion.header>
 
       {/* ============================================================ */}
@@ -242,9 +235,12 @@ export default function Navbar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.28 }}
-            className="fixed inset-0 z-40 bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between p-5 pt-24 sm:p-8 lg:hidden overflow-y-auto"
+            className="fixed inset-0 z-40 bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between p-5 pt-20 sm:p-8 lg:hidden overflow-y-auto max-h-[100dvh]"
+            style={{
+              paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
+            }}
           >
-            <div className="flex flex-col gap-6 mt-2">
+            <div className="flex flex-col gap-4 sm:gap-6 mt-1">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <span className="text-[10px] tracking-[0.3em] uppercase text-[#c9a87c] font-medium">
                   CAMPAIGN NAVIGATION
@@ -255,7 +251,7 @@ export default function Navbar() {
               </div>
 
               {/* Navigation Links */}
-              <nav className="flex flex-col gap-2 sm:gap-4" aria-label="Mobile Navigation">
+              <nav className="flex flex-col gap-1 sm:gap-2" aria-label="Mobile Navigation">
                 {navLinks.map((link, idx) => (
                   <motion.a
                     key={link.href}
@@ -264,7 +260,7 @@ export default function Navbar() {
                     initial={prefersReducedMotion ? false : { x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: 0.04 * idx, duration: 0.35 }}
-                    className="flex items-baseline justify-between py-2.5 border-b border-white/10 text-2xl sm:text-3xl font-serif font-light tracking-tight text-[#f5f2eb] hover:text-[#c9a87c] transition-colors min-h-[48px]"
+                    className="flex items-baseline justify-between py-2 sm:py-2.5 border-b border-white/10 text-xl sm:text-2xl font-serif font-light tracking-tight text-[#f5f2eb] hover:text-[#c9a87c] transition-colors min-h-[44px]"
                   >
                     <span>{link.label}</span>
                     <span className="font-mono text-xs text-[#c9a87c] tracking-widest">
@@ -274,15 +270,25 @@ export default function Navbar() {
                 ))}
               </nav>
 
+              {/* Compact Promotional Offer Card at Bottom of Nav Links */}
+              <BookingPromoMobileDrawer
+                showPromo={showPromo}
+                onDismiss={handleDismissPromo}
+                onSelectOffer={() => {
+                  setMobileMenuOpen(false);
+                  openBooking();
+                }}
+              />
+
               {/* Primary Booking CTA inside Drawer */}
-              <div className="pt-2 flex flex-col gap-3">
+              <div className="pt-1 flex flex-col gap-2.5 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setMobileMenuOpen(false);
                     openBooking();
                   }}
-                  className="flex items-center justify-between w-full p-4 bg-[#f5f2eb] text-[#0c0b0a] font-bold text-xs tracking-[0.2em] uppercase hover:bg-[#c9a87c] transition-colors min-h-[50px] shadow-[0_4px_20px_rgba(245,242,235,0.12)] cursor-pointer"
+                  className="flex items-center justify-between w-full p-3.5 sm:p-4 bg-[#f5f2eb] text-[#0c0b0a] font-bold text-xs tracking-[0.2em] uppercase hover:bg-[#c9a87c] transition-colors min-h-[48px] shadow-[0_4px_20px_rgba(245,242,235,0.12)] cursor-pointer"
                   style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
                 >
                   <span className="flex items-center gap-2.5">
@@ -297,7 +303,7 @@ export default function Navbar() {
                   href={siteData.business.social.instagram.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between w-full p-3.5 border border-white/15 bg-white/[0.03] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[46px]"
+                  className="flex items-center justify-between w-full p-3 sm:p-3.5 border border-white/15 bg-white/[0.03] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[44px]"
                 >
                   <span className="flex items-center gap-2.5">
                     <InstagramIcon className="w-4 h-4 text-[#E1306C]" color="#E1306C" />
@@ -309,17 +315,17 @@ export default function Navbar() {
             </div>
 
             {/* Mobile Footer Information */}
-            <div className="mt-8 pt-5 border-t border-white/10 flex flex-col gap-2 text-xs text-white/60 font-sans">
-              <div className="text-[#f5f2eb] font-medium text-sm flex items-center justify-between">
+            <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-1.5 text-xs text-white/60 font-sans">
+              <div className="text-[#f5f2eb] font-medium text-xs sm:text-sm flex items-center justify-between">
                 <span>{siteData.business.name}</span>
                 <span className="text-[9px] font-mono text-[#c9a87c] tracking-widest uppercase">
                   PANIPAT, HARYANA
                 </span>
               </div>
-              <div className="text-[11px] leading-relaxed text-[#eae6df]/80">
+              <div className="text-[10.5px] sm:text-[11px] leading-relaxed text-[#eae6df]/80">
                 {siteData.business.address.fullAddress}
               </div>
-              <div className="text-[#c9a87c] text-[11px] mt-1 font-mono">
+              <div className="text-[#c9a87c] text-[10.5px] sm:text-[11px] mt-0.5 font-mono">
                 {siteData.business.contact.phoneDisplay}
               </div>
             </div>
