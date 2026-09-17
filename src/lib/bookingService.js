@@ -1,7 +1,16 @@
 import prisma from "@/lib/prisma";
-import { isTuesday, isPastDate, BOOKING_SLOTS, BOOKING_ADVANCE } from "@/data/bookingConfig";
+import {
+  isTuesday,
+  isPastDate,
+  BOOKING_SLOTS,
+  BOOKING_ADVANCE,
+  getTodayKolkataString,
+  isSlotAvailableTimeWise,
+  sanitizePhone,
+  isValidPhone,
+} from "@/data/bookingConfig";
 
-export const HOLD_DURATION_MINUTES = 10;
+export { sanitizePhone, isValidPhone };
 
 /**
  * Generates a human-friendly unique booking code (e.g. GE-7K2M9P)
@@ -14,53 +23,6 @@ export function generateBookingCode() {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return `GE-${code}`;
-}
-
-/**
- * Sanitizes phone number to standard 10-digit format
- * @param {string} rawPhone
- * @returns {string}
- */
-export function sanitizePhone(rawPhone = "") {
-  let cleaned = String(rawPhone).replace(/\D/g, "");
-  if (cleaned.startsWith("91") && cleaned.length === 12) {
-    cleaned = cleaned.slice(2);
-  } else if (cleaned.startsWith("0") && cleaned.length === 11) {
-    cleaned = cleaned.slice(1);
-  }
-  return cleaned;
-}
-
-/**
- * Validates phone format (must be 10 digits Indian mobile)
- * @param {string} phone
- * @returns {boolean}
- */
-export function isValidPhone(phone = "") {
-  const cleaned = sanitizePhone(phone);
-  return cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned);
-}
-
-/**
- * Expires stale temporary slot holds
- */
-export async function expireStaleHolds() {
-  try {
-    const now = new Date();
-    await prisma.booking.updateMany({
-      where: {
-        bookingStatus: "PENDING_PAYMENT",
-        slotHoldExpiresAt: {
-          lte: now,
-        },
-      },
-      data: {
-        bookingStatus: "EXPIRED",
-      },
-    });
-  } catch (err) {
-    console.error("Error expiring stale holds:", err);
-  }
 }
 
 /**
@@ -97,48 +59,52 @@ export async function getSlotAvailabilityForDate(dateString) {
     };
   }
 
-  // Clean up stale holds first
-  await expireStaleHolds();
+  const todayKolkata = getTodayKolkataString();
+  const isSelectedDateToday = dateString === todayKolkata;
 
-  const now = new Date();
-
-  // Fetch active bookings for the specified date
-  const activeBookings = await prisma.booking.findMany({
-    where: {
-      bookingDate: dateString,
-      OR: [
-        { bookingStatus: "CONFIRMED" },
-        {
-          bookingStatus: "PENDING_PAYMENT",
-          slotHoldExpiresAt: {
-            gt: now,
-          },
-        },
-      ],
-    },
-    select: {
-      bookingTime: true,
-      bookingStatus: true,
-      slotHoldExpiresAt: true,
-    },
-  });
-
-  const bookedSlotMap = new Map();
-  for (const b of activeBookings) {
-    if (b.bookingStatus === "CONFIRMED") {
-      bookedSlotMap.set(b.bookingTime, "BOOKED");
-    } else if (b.bookingStatus === "PENDING_PAYMENT" && b.slotHoldExpiresAt > now) {
-      bookedSlotMap.set(b.bookingTime, "HELD");
-    }
+  // Fetch confirmed bookings for the specified date
+  let confirmedBookings = [];
+  try {
+    confirmedBookings = await prisma.booking.findMany({
+      where: {
+        bookingDate: dateString,
+        bookingStatus: "CONFIRMED",
+      },
+      select: {
+        bookingTime: true,
+        bookingStatus: true,
+      },
+    });
+  } catch (dbErr) {
+    console.warn("[BookingService] DB availability query notice:", dbErr.message);
   }
 
+  const bookedSlotSet = new Set(confirmedBookings.map((b) => b.bookingTime));
+
   const slots = BOOKING_SLOTS.map((slot) => {
-    const slotStatus = bookedSlotMap.get(slot);
-    const available = !slotStatus;
+    // 1. Check if the slot start time has already passed or is within 15-min buffer for today
+    if (isSelectedDateToday && !isSlotAvailableTimeWise(dateString, slot, 15)) {
+      return {
+        slot,
+        available: false,
+        status: "PAST_SLOT",
+      };
+    }
+
+    // 2. Check if the slot is already booked in database
+    if (bookedSlotSet.has(slot)) {
+      return {
+        slot,
+        available: false,
+        status: "BOOKED",
+      };
+    }
+
+    // 3. Slot is available
     return {
       slot,
-      available,
-      status: slotStatus || "AVAILABLE",
+      available: true,
+      status: "AVAILABLE",
     };
   });
 
@@ -159,23 +125,23 @@ export async function isSlotAvailable(dateString, timeSlot) {
     return false;
   }
 
-  const now = new Date();
+  // Check 15-minute buffer if date is today
+  if (!isSlotAvailableTimeWise(dateString, timeSlot, 15)) {
+    return false;
+  }
 
-  const conflict = await prisma.booking.findFirst({
-    where: {
-      bookingDate: dateString,
-      bookingTime: timeSlot,
-      OR: [
-        { bookingStatus: "CONFIRMED" },
-        {
-          bookingStatus: "PENDING_PAYMENT",
-          slotHoldExpiresAt: {
-            gt: now,
-          },
-        },
-      ],
-    },
-  });
+  try {
+    const conflict = await prisma.booking.findFirst({
+      where: {
+        bookingDate: dateString,
+        bookingTime: timeSlot,
+        bookingStatus: "CONFIRMED",
+      },
+    });
 
-  return !conflict;
+    return !conflict;
+  } catch (err) {
+    console.error("[BookingService] isSlotAvailable error:", err);
+    return true; // allow proceeding to payment if read fails transiently
+  }
 }

@@ -202,6 +202,132 @@ export const NOTIFICATION_RECIPIENTS = {
 export const CONTACT_EMAIL = "hello@glamouremporium.in";
 
 /**
+ * Returns today's date formatted as YYYY-MM-DD in Asia/Kolkata timezone
+ * @returns {string}
+ */
+export function getTodayKolkataString() {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return formatter.format(new Date());
+  } catch {
+    return new Date().toISOString().split("T")[0];
+  }
+}
+
+/**
+ * Returns the current time components in Asia/Kolkata timezone
+ * @returns {{todayStr: string, hours: number, minutes: number, totalMinutes: number}}
+ */
+export function getNowInKolkata() {
+  const now = new Date();
+  let hours = 0;
+  let minutes = 0;
+
+  try {
+    const kolkataTimeStr = now.toLocaleTimeString("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const parts = kolkataTimeStr.split(":");
+    hours = parseInt(parts[0], 10) || 0;
+    minutes = parseInt(parts[1], 10) || 0;
+  } catch {
+    hours = now.getHours();
+    minutes = now.getMinutes();
+  }
+
+  const todayStr = getTodayKolkataString();
+  return {
+    todayStr,
+    hours,
+    minutes,
+    totalMinutes: hours * 60 + minutes,
+  };
+}
+
+/**
+ * Parses a slot time string (e.g. "10:00 AM", "02:00 PM") into total minutes from midnight
+ * @param {string} slotStr 
+ * @returns {number|null}
+ */
+export function parseSlotTimeToMinutes(slotStr = "") {
+  if (!slotStr) return null;
+  const match = String(slotStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const meridiem = match[3].toUpperCase();
+
+  if (meridiem === "PM" && hours !== 12) hours += 12;
+  if (meridiem === "AM" && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+}
+
+/**
+ * Determines whether a time slot is in the future and respects the 15-minute booking buffer
+ * @param {string} dateString - YYYY-MM-DD
+ * @param {string} slotString - e.g. "02:00 PM"
+ * @param {number} [bufferMinutes=15] - Minimum lead time in minutes required
+ * @returns {boolean}
+ */
+export function isSlotAvailableTimeWise(dateString, slotString, bufferMinutes = 15) {
+  if (!dateString || !slotString) return false;
+  if (isTuesday(dateString)) return false;
+
+  const { todayStr, totalMinutes } = getNowInKolkata();
+
+  // If date is before today in Asia/Kolkata
+  if (dateString < todayStr) {
+    return false;
+  }
+
+  // If date is in the future, all standard slots are available time-wise
+  if (dateString > todayStr) {
+    return true;
+  }
+
+  // If date is today: slot start time must be at least bufferMinutes in the future
+  const slotMinutes = parseSlotTimeToMinutes(slotString);
+  if (slotMinutes === null) return false;
+
+  return slotMinutes >= totalMinutes + bufferMinutes;
+}
+
+/**
+ * Normalizes Indian phone number by removing non-digits, leading +91/91/0, and limiting to 10 digits
+ * @param {string} rawPhone 
+ * @returns {string}
+ */
+export function sanitizePhone(rawPhone = "") {
+  let cleaned = String(rawPhone || "").replace(/\D/g, "");
+  if (cleaned.startsWith("91") && cleaned.length > 10) {
+    cleaned = cleaned.slice(2);
+  } else if (cleaned.startsWith("0") && cleaned.length > 10) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned.slice(0, 10);
+}
+
+/**
+ * Validates whether the given string is a valid 10-digit Indian mobile number
+ * @param {string} phone 
+ * @returns {boolean}
+ */
+export function isValidPhone(phone = "") {
+  const cleaned = sanitizePhone(phone);
+  return cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned);
+}
+
+/**
  * Checks if a given YYYY-MM-DD date falls on Tuesday (Salon Closed)
  * @param {string} dateString - "YYYY-MM-DD"
  * @returns {boolean}
@@ -218,18 +344,15 @@ export function isTuesday(dateString) {
 }
 
 /**
- * Checks if a given YYYY-MM-DD date is in the past
+ * Checks if a given YYYY-MM-DD date is in the past in Asia/Kolkata
  * @param {string} dateString - "YYYY-MM-DD"
  * @returns {boolean}
  */
 export function isPastDate(dateString) {
   if (!dateString) return false;
   try {
-    const [year, month, day] = dateString.split("-").map(Number);
-    const selectedDate = new Date(year, month - 1, day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return selectedDate < today;
+    const todayKolkata = getTodayKolkataString();
+    return dateString < todayKolkata;
   } catch {
     return false;
   }
@@ -249,6 +372,7 @@ export function formatDisplayDate(dateString) {
       day: "numeric",
       month: "long",
       year: "numeric",
+      timeZone: "Asia/Kolkata",
     });
   } catch {
     return dateString;

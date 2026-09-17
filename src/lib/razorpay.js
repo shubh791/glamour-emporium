@@ -12,11 +12,19 @@ export function getRazorpayConfig() {
   const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || "";
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || "";
 
+  const isPlaceholder =
+    !keyId ||
+    !keySecret ||
+    keyId.includes("placeholder") ||
+    keyId.includes("xxxx") ||
+    keySecret.includes("placeholder") ||
+    keySecret.includes("your_test_secret");
+
   return {
     keyId,
     keySecret,
     webhookSecret,
-    isConfigured: Boolean(keyId && keySecret),
+    isConfigured: Boolean(keyId && keySecret && !isPlaceholder),
   };
 }
 
@@ -27,7 +35,7 @@ export function getRazorpayInstance() {
   const { keyId, keySecret, isConfigured } = getRazorpayConfig();
   if (!isConfigured) {
     throw new Error(
-      "Razorpay credentials missing. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."
+      "Razorpay credentials not configured. Please add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env.local."
     );
   }
 
@@ -56,12 +64,12 @@ export async function createRazorpayOrder({
 
   if (!config.isConfigured) {
     const errorMsg =
-      "Razorpay credentials missing on server. RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is empty.";
-    console.error("[Razorpay Server PG Error]", errorMsg);
+      "Razorpay test keys are not configured. Please add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env.local file to test checkout.";
+    console.warn("[Razorpay Server PG Warning]", errorMsg);
     return {
       success: false,
       error: errorMsg,
-      code: "RAZORPAY_CONFIG_MISSING",
+      code: "RAZORPAY_KEYS_NOT_CONFIGURED",
     };
   }
 

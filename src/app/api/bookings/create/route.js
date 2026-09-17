@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import {
   generateBookingCode,
   sanitizePhone,
   isValidPhone,
   isSlotAvailable,
-  HOLD_DURATION_MINUTES,
 } from "@/lib/bookingService";
 import { createRazorpayOrder, getRazorpayConfig } from "@/lib/razorpay";
-import { isTuesday, isPastDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
+import {
+  isTuesday,
+  isPastDate,
+  isSlotAvailableTimeWise,
+  BOOKING_ADVANCE,
+} from "@/data/bookingConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +39,7 @@ export async function POST(request) {
     const cleanedPhone = sanitizePhone(phone);
     if (!isValidPhone(cleanedPhone)) {
       return NextResponse.json(
-        { error: "Please enter a valid 10-digit Indian phone number" },
+        { error: "Enter a valid 10-digit mobile number." },
         { status: 400 }
       );
     }
@@ -78,61 +81,45 @@ export async function POST(request) {
       );
     }
 
-    // 4. Check Slot Availability
-    const available = await isSlotAvailable(bookingDate, bookingTime);
-    if (!available) {
+    // 4. Validate 15-minute lead buffer if date is today
+    if (!isSlotAvailableTimeWise(bookingDate, bookingTime, 15)) {
       return NextResponse.json(
         {
-          error: "This time slot is no longer available. Please choose another slot.",
+          error: "This time slot is no longer available today. Please select another slot.",
           code: "SLOT_UNAVAILABLE",
         },
         { status: 409 }
       );
     }
 
-    // 5. Generate Unique Booking Code
-    let bookingCode = generateBookingCode();
-    let isCodeUnique = false;
-    let attempts = 0;
-    while (!isCodeUnique && attempts < 5) {
-      const existing = await prisma.booking.findUnique({ where: { bookingCode } });
-      if (!existing) {
-        isCodeUnique = true;
-      } else {
-        bookingCode = generateBookingCode();
-        attempts++;
-      }
+    // 5. Check Slot Availability in Database
+    const available = await isSlotAvailable(bookingDate, bookingTime);
+    if (!available) {
+      return NextResponse.json(
+        {
+          error: "This time slot is already booked. Please choose another slot.",
+          code: "SLOT_UNAVAILABLE",
+        },
+        { status: 409 }
+      );
     }
 
-    // 6. Calculate 10-minute hold expiration
-    const slotHoldExpiresAt = new Date(Date.now() + HOLD_DURATION_MINUTES * 60 * 1000);
-    const amount = BOOKING_ADVANCE; // Force 99 INR server-side
+    // 6. Check Razorpay Configuration
+    const razorpayConfig = getRazorpayConfig();
+    if (!razorpayConfig.isConfigured) {
+      return NextResponse.json(
+        {
+          error:
+            "Razorpay test keys are not configured. Please add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env.local file to test checkout.",
+          code: "RAZORPAY_KEYS_NOT_CONFIGURED",
+        },
+        { status: 400 }
+      );
+    }
 
-    // 7. Create Temporary Booking Record in Database
-    const booking = await prisma.booking.create({
-      data: {
-        bookingCode,
-        customerName: customerName.trim(),
-        phone: cleanedPhone,
-        serviceCategory,
-        service: service || null,
-        bookingDate,
-        bookingTime,
-        notes: notes ? notes.trim() : null,
-        amount,
-        currency: "INR",
-        paymentStatus: "PENDING",
-        bookingStatus: "PENDING_PAYMENT",
-        slotHoldExpiresAt,
-      },
-    });
-
-    console.log("[Create Booking Route] Pending booking created in DB:", {
-      bookingCode,
-      date: bookingDate,
-      slot: bookingTime,
-      phoneLast4: cleanedPhone.slice(-4),
-    });
+    // 7. Generate Unique Booking Code for Receipt
+    const bookingCode = generateBookingCode();
+    const amount = BOOKING_ADVANCE; // ₹99
 
     // 8. Create Razorpay Order on Server
     const razorpayOrderResult = await createRazorpayOrder({
@@ -144,68 +131,61 @@ export async function POST(request) {
         customerEmail: "customer@glamouremporium.in",
       },
       notes: {
+        bookingCode,
+        customerName: customerName.trim(),
+        customerPhone: cleanedPhone,
         serviceCategory,
         service: service || serviceCategory,
         bookingDate,
         bookingTime,
+        notes: notes ? String(notes).trim().slice(0, 200) : "",
       },
     });
 
     if (!razorpayOrderResult.success || !razorpayOrderResult.orderId) {
       console.error("[Create Booking Route] Razorpay order creation failed:", {
-        bookingCode: booking.bookingCode,
+        bookingCode,
         error: razorpayOrderResult.error,
         code: razorpayOrderResult.code,
       });
 
-      // Delete temporary booking on immediate order creation failure
-      await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
-
       return NextResponse.json(
         {
-          error: "We couldn't start the secure payment session. Please try again.",
-          details: razorpayOrderResult.error || "Failed to initialize Razorpay order",
+          error: razorpayOrderResult.error || "We couldn't start the secure payment session. Please try again.",
           code: razorpayOrderResult.code || "PAYMENT_INIT_FAILED",
         },
-        { status: 502 }
+        { status: razorpayOrderResult.code === "RAZORPAY_KEYS_NOT_CONFIGURED" ? 400 : 502 }
       );
     }
 
-    // Link Razorpay Order ID to the booking record
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        razorpayOrderId: razorpayOrderResult.orderId,
-      },
-    });
-
-    console.log("[Create Booking Route] Razorpay order ready:", {
-      bookingCode: booking.bookingCode,
+    console.log("[Create Booking Route] Razorpay order created successfully:", {
+      bookingCode,
       razorpayOrderId: razorpayOrderResult.orderId,
       amountPaise: razorpayOrderResult.amount,
     });
 
     return NextResponse.json({
       success: true,
-      bookingCode: booking.bookingCode,
+      bookingCode,
       razorpayOrderId: razorpayOrderResult.orderId,
       keyId: razorpayOrderResult.keyId,
       amount: razorpayOrderResult.amount, // in paise (9900)
       amountInRupees: amount, // ₹99
       currency: razorpayOrderResult.currency || "INR",
-      slotHoldExpiresAt: slotHoldExpiresAt.toISOString(),
-      customerName: booking.customerName,
-      phone: booking.phone,
-      service: booking.service || booking.serviceCategory,
-      bookingDate: booking.bookingDate,
-      bookingTime: booking.bookingTime,
+      customerName: customerName.trim(),
+      phone: cleanedPhone,
+      serviceCategory,
+      service: service || serviceCategory,
+      bookingDate,
+      bookingTime,
+      notes: notes ? notes.trim() : null,
     });
   } catch (err) {
     console.error("[Create Booking Route] Unhandled exception:", err);
     return NextResponse.json(
       {
-        error: "Internal server error while processing booking",
-        details: err.message,
+        error: "Unable to process booking request. Please check your details and try again.",
+        details: process.env.NODE_ENV === "development" ? err.message : undefined,
       },
       { status: 500 }
     );

@@ -32,6 +32,10 @@ import {
   isTuesday,
   isPastDate,
   formatDisplayDate,
+  getTodayKolkataString,
+  isSlotAvailableTimeWise,
+  sanitizePhone,
+  isValidPhone,
   buildCustomerConfirmationWhatsAppUrl,
 } from "@/data/bookingConfig";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -92,8 +96,8 @@ export default function BookingModal() {
   const [slotsState, setSlotsState] = useState([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
-  // Today string for min attribute in date picker
-  const todayString = new Date().toISOString().split("T")[0];
+  // Today string for min attribute in date picker (Asia/Kolkata)
+  const todayKolkataString = getTodayKolkataString();
 
   // Fetch live slot availability for chosen date
   const fetchAvailability = useCallback(async (dateStr) => {
@@ -211,15 +215,38 @@ export default function BookingModal() {
   const handleChange = (field, value) => {
     setFormData((prev) => {
       const updated = { ...prev, [field]: value };
-      // If date changed to Tuesday, clear selected timeSlot
-      if (field === "date" && isTuesday(value)) {
-        updated.timeSlot = "";
-      }
       return updated;
     });
 
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    const raw = e.target.value;
+    const clean = sanitizePhone(raw);
+    setFormData((prev) => ({ ...prev, phone: clean }));
+    if (errors.phone) {
+      setErrors((prev) => ({ ...prev, phone: "" }));
+    }
+  };
+
+  const handleDateChange = (newDate) => {
+    setFormData((prev) => {
+      const updated = { ...prev, date: newDate };
+      // When date changes, immediately clear any previously selected invalid/past slot
+      if (prev.timeSlot) {
+        const isStillValid = isSlotAvailableTimeWise(newDate, prev.timeSlot, 15);
+        if (!isStillValid || isTuesday(newDate)) {
+          updated.timeSlot = "";
+        }
+      }
+      return updated;
+    });
+
+    if (errors.date) {
+      setErrors((prev) => ({ ...prev, date: "" }));
     }
   };
 
@@ -252,11 +279,9 @@ export default function BookingModal() {
       newErrors.name = "Please enter your full name";
     }
 
-    const cleanPhone = formData.phone.trim().replace(/\D/g, "");
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Please enter your phone number";
-    } else if (cleanPhone.length < 10) {
-      newErrors.phone = "Please enter a valid 10-digit Indian phone number";
+    const cleanPhone = sanitizePhone(formData.phone);
+    if (!formData.phone.trim() || !isValidPhone(cleanPhone)) {
+      newErrors.phone = "Enter a valid 10-digit mobile number.";
     }
 
     if (!formData.category) {
@@ -275,6 +300,8 @@ export default function BookingModal() {
       if (!isSelectedDateTuesday) {
         newErrors.timeSlot = "Please choose a preferred time slot";
       }
+    } else if (formData.date && !isSlotAvailableTimeWise(formData.date, formData.timeSlot, 15)) {
+      newErrors.timeSlot = "This time slot is no longer available today";
     }
 
     setErrors(newErrors);
@@ -286,12 +313,12 @@ export default function BookingModal() {
       if (typeof dateInputRef.current.showPicker === "function") {
         try {
           dateInputRef.current.showPicker();
+          return;
         } catch {
-          dateInputRef.current.focus();
+          // fallback
         }
-      } else {
-        dateInputRef.current.focus();
       }
+      dateInputRef.current.focus();
     }
   };
 
@@ -319,7 +346,7 @@ export default function BookingModal() {
         category: formData.category,
       });
 
-      // 1. Create Booking & Temporary 10-min Slot Hold on Server
+      // 1. Create Razorpay Order on Server
       const createRes = await fetch("/api/bookings/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -350,7 +377,11 @@ export default function BookingModal() {
           createData.error ||
           createData.details ||
           "We couldn't start the secure payment session. Please try again.";
-        setPaymentErrorTitle("PAYMENT COULD NOT START");
+        setPaymentErrorTitle(
+          createData.code === "RAZORPAY_KEYS_NOT_CONFIGURED"
+            ? "RAZORPAY SETUP REQUIRED"
+            : "PAYMENT COULD NOT START"
+        );
         setPaymentErrorMessage(errorText);
         setPaymentStatus(PAYMENT_STATUS.FAILED);
         setIsSubmitting(false);
@@ -421,6 +452,13 @@ export default function BookingModal() {
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
                 razorpaySignature: response.razorpay_signature,
+                customerName: formData.name,
+                phone: formData.phone,
+                serviceCategory: formData.category,
+                service: formData.service,
+                bookingDate: formData.date,
+                bookingTime: formData.timeSlot,
+                notes: formData.notes,
               }),
             });
 
@@ -649,10 +687,12 @@ export default function BookingModal() {
                       <input
                         id="booking-phone"
                         type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
                         disabled={isSelectedDateTuesday}
                         value={formData.phone}
-                        onChange={(e) => handleChange("phone", e.target.value)}
-                        placeholder="+91 98765 43210"
+                        onChange={handlePhoneChange}
+                        placeholder="10-digit mobile number"
                         autoComplete="tel"
                         className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
                           errors.phone
@@ -773,12 +813,24 @@ export default function BookingModal() {
 
                   </div>
 
-                  {/* Row 3: Preferred Date (ALWAYS INTERACTIVE & VISUAL FOCUS ON TUESDAY) */}
-                  <div className="flex flex-col gap-1.5">
+                  {/* Row 3: Preferred Date (Full field click opens native calendar) */}
+                  <div
+                    onClick={handleOpenDatePicker}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleOpenDatePicker();
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select appointment date"
+                    className="flex flex-col gap-1.5 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a87c]"
+                  >
                     <div className="flex items-center justify-between">
                       <label
                         htmlFor="booking-date"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
+                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5 cursor-pointer"
                       >
                         <CalendarDays className="w-3 h-3 text-[#c9a87c]" />
                         <span>Preferred Date <span className="text-[#c9a87c]">*</span></span>
@@ -789,22 +841,28 @@ export default function BookingModal() {
                         </span>
                       )}
                     </div>
-                    <input
-                      ref={dateInputRef}
-                      id="booking-date"
-                      type="date"
-                      min={todayString}
-                      value={formData.date}
-                      onChange={(e) => handleChange("date", e.target.value)}
-                      style={{ colorScheme: "dark" }}
-                      className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
-                        errors.date
-                          ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                          : isSelectedDateTuesday
-                          ? "border-[#c9a87c] ring-1 ring-[#c9a87c]/50 shadow-[0_0_14px_rgba(201,168,124,0.2)]"
-                          : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                      }`}
-                    />
+                    <div className="relative w-full cursor-pointer">
+                      <input
+                        ref={dateInputRef}
+                        id="booking-date"
+                        type="date"
+                        min={todayKolkataString}
+                        value={formData.date}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDatePicker();
+                        }}
+                        onChange={(e) => handleDateChange(e.target.value)}
+                        style={{ colorScheme: "dark" }}
+                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
+                          errors.date
+                            ? "border-[#df9b8a] focus:border-[#df9b8a]"
+                            : isSelectedDateTuesday
+                            ? "border-[#c9a87c] ring-1 ring-[#c9a87c]/50 shadow-[0_0_14px_rgba(201,168,124,0.2)]"
+                            : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
+                        }`}
+                      />
+                    </div>
                     {isSelectedDateTuesday ? (
                       <p className="text-[10.5px] text-[#eae6df]/65 font-sans mt-0.5">
                         Choose any date except Tuesday.
@@ -844,66 +902,88 @@ export default function BookingModal() {
                     </div>
                   )}
 
-                  {/* Row 3: Selectable Time Slots Grid (Live Server Availability) */}
-                  <div className={`flex flex-col gap-2 pt-1 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-35 pointer-events-none select-none" : ""}`}>
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5">
-                        <Clock className="w-3 h-3 text-[#c9a87c]" />
-                        <span>Select Time Slot <span className="text-[#c9a87c]">*</span></span>
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {isLoadingSlots && (
-                          <span className="text-[9px] font-mono text-[#c9a87c] flex items-center gap-1">
-                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                            <span>Checking slots...</span>
-                          </span>
-                        )}
-                        <span className="text-[9px] font-mono text-[#c9a87c] uppercase">
-                          10:00 AM – 08:00 PM
-                        </span>
-                      </div>
-                    </div>
+                  {/* Row 4: Selectable Time Slots Grid (Dynamic Asia/Kolkata filtering with 15-min buffer) */}
+                  {(() => {
+                    const isSelectedDateToday = formData.date === todayKolkataString;
+                    const visibleSlots = BOOKING_SLOTS.filter((slot) => {
+                      if (!formData.date) return true;
+                      return isSlotAvailableTimeWise(formData.date, slot, 15);
+                    });
+                    const hasNoSlotsRemainingToday = isSelectedDateToday && visibleSlots.length === 0;
 
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {BOOKING_SLOTS.map((slot) => {
-                        const serverSlotInfo = slotsState.find((s) => s.slot === slot);
-                        const isUnavailable = serverSlotInfo ? !serverSlotInfo.available : false;
-                        const slotBadge = serverSlotInfo?.status === "HELD" ? "Reserved" : "Booked";
-                        const isSelected = formData.timeSlot === slot;
-
-                        return (
-                          <button
-                            key={slot}
-                            type="button"
-                            disabled={isSelectedDateTuesday || isUnavailable}
-                            onClick={() => handleChange("timeSlot", slot)}
-                            className={`relative px-2.5 py-2 text-xs font-mono tracking-wider transition-all duration-200 border text-center flex flex-col items-center justify-center min-h-[42px] ${
-                              isSelectedDateTuesday
-                                ? "bg-white/[0.02] border-white/10 text-white/40 cursor-not-allowed"
-                                : isUnavailable
-                                ? "bg-white/[0.02] border-white/5 text-white/30 cursor-not-allowed line-through"
-                                : isSelected
-                                ? "bg-[#c9a87c] border-[#c9a87c] text-[#0c0b0a] font-bold shadow-[0_2px_10px_rgba(201,168,124,0.3)]"
-                                : "bg-[#0c0b0a]/70 border-white/15 text-[#eae6df] hover:border-[#c9a87c]/70 hover:text-white cursor-pointer"
-                            }`}
-                          >
-                            <span>{slot}</span>
-                            {isUnavailable && !isSelectedDateTuesday && (
-                              <span className="text-[7px] font-mono uppercase tracking-widest text-white/40 not-line-through">
-                                {slotBadge}
+                    return (
+                      <div className={`flex flex-col gap-2 pt-1 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-35 pointer-events-none select-none" : ""}`}>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-[#c9a87c]" />
+                            <span>Select Time Slot <span className="text-[#c9a87c]">*</span></span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {isLoadingSlots && (
+                              <span className="text-[9px] font-mono text-[#c9a87c] flex items-center gap-1">
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                <span>Checking slots...</span>
                               </span>
                             )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                            <span className="text-[9px] font-mono text-[#c9a87c] uppercase">
+                              10:00 AM – 08:00 PM
+                            </span>
+                          </div>
+                        </div>
 
-                    {errors.timeSlot && !isSelectedDateTuesday && (
-                      <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                        {errors.timeSlot}
-                      </span>
-                    )}
-                  </div>
+                        {hasNoSlotsRemainingToday ? (
+                          <div className="p-4 bg-white/[0.03] border border-[#c9a87c]/35 text-center space-y-1 my-1">
+                            <p className="text-xs font-mono text-[#c9a87c] font-semibold">
+                              No slots available today. Please select another date.
+                            </p>
+                            <p className="text-[11px] text-[#eae6df]/70 font-sans">
+                              All booking slots for today have already passed our 15-minute preparation buffer.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {visibleSlots.map((slot) => {
+                              const serverSlotInfo = slotsState.find((s) => s.slot === slot);
+                              const isUnavailable = serverSlotInfo ? !serverSlotInfo.available : false;
+                              const slotBadge = serverSlotInfo?.status === "HELD" ? "Reserved" : "Booked";
+                              const isSelected = formData.timeSlot === slot;
+
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  disabled={isSelectedDateTuesday || isUnavailable}
+                                  onClick={() => handleChange("timeSlot", slot)}
+                                  className={`relative px-2.5 py-2 text-xs font-mono tracking-wider transition-all duration-200 border text-center flex flex-col items-center justify-center min-h-[42px] ${
+                                    isSelectedDateTuesday
+                                      ? "bg-white/[0.02] border-white/10 text-white/40 cursor-not-allowed"
+                                      : isUnavailable
+                                      ? "bg-white/[0.02] border-white/5 text-white/30 cursor-not-allowed line-through"
+                                      : isSelected
+                                      ? "bg-[#c9a87c] border-[#c9a87c] text-[#0c0b0a] font-bold shadow-[0_2px_10px_rgba(201,168,124,0.3)]"
+                                      : "bg-[#0c0b0a]/70 border-white/15 text-[#eae6df] hover:border-[#c9a87c]/70 hover:text-white cursor-pointer"
+                                  }`}
+                                >
+                                  <span>{slot}</span>
+                                  {isUnavailable && !isSelectedDateTuesday && (
+                                    <span className="text-[7px] font-mono uppercase tracking-widest text-white/40 not-line-through">
+                                      {slotBadge}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {errors.timeSlot && !isSelectedDateTuesday && !hasNoSlotsRemainingToday && (
+                          <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                            {errors.timeSlot}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Row 4: Optional Notes (Preserved & Visually Locked if Tuesday) */}
                   <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
