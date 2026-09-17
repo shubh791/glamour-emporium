@@ -46,6 +46,13 @@ export const siteData = {
         url: "https://instagram.com/glamour_emporium_unisex_salon",
       },
     },
+    legalEntity: {
+      legalName: "SS Enterprises",
+      operatingBrand: "Glamour Emporium Unisex Salon",
+      proprietor: "Salma Saifi",
+      gstin: "06OXPPS0718P1ZD",
+      relationship: "Glamour Emporium Unisex Salon is operated by SS Enterprises.",
+    },
   },
   navigation: [
     { label: "Home", href: "/#hero" },

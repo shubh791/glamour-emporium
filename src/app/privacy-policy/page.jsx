@@ -188,6 +188,46 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
+        {/* Section 8: Legal Business Information */}
+        <section className="space-y-4 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-2 text-xs font-mono tracking-[0.2em] uppercase text-[#c9a87c]">
+            <span>08. LEGAL BUSINESS INFORMATION</span>
+          </div>
+          <h2 className="font-serif text-2xl sm:text-3xl text-[#f5f2eb] font-normal tracking-tight">
+            Merchant &amp; Statutory Registration
+          </h2>
+          <p className="text-xs sm:text-sm text-[#eae6df]/85">
+            For statutory compliance, merchant verification, and payment gateway onboarding:
+          </p>
+
+          <div className="p-5 sm:p-6 bg-white/[0.02] border border-white/10 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+              <div className="space-y-1">
+                <span className="text-white/40 block text-[10px] uppercase tracking-wider">Legal Business Name</span>
+                <span className="text-[#f5f2eb] font-semibold text-sm">SS Enterprises</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-white/40 block text-[10px] uppercase tracking-wider">Operating Brand</span>
+                <span className="text-[#f5f2eb] font-semibold text-sm">Glamour Emporium Unisex Salon</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-white/40 block text-[10px] uppercase tracking-wider">Proprietor</span>
+                <span className="text-[#f5f2eb] text-sm">Salma Saifi</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-white/40 block text-[10px] uppercase tracking-wider">GSTIN</span>
+                <span className="text-[#c9a87c] font-semibold text-sm tracking-wider">06OXPPS0718P1ZD</span>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-white/10 text-xs text-[#eae6df]/80 font-sans">
+              <p className="leading-relaxed">
+                <strong className="text-[#f5f2eb]">Glamour Emporium Unisex Salon is operated by SS Enterprises.</strong> All online payment processing is handled securely via Razorpay on behalf of SS Enterprises.
+              </p>
+            </div>
+          </div>
+        </section>
+
       </div>
     </PolicyShell>
   );

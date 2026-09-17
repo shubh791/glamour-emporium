@@ -156,6 +156,14 @@ function SalonContactCard() {
               </a>
             </div>
           </div>
+
+          <div className="pt-3 border-t border-white/10 text-[10.5px] font-mono text-white/50 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Operated by: <strong className="text-white/80">SS Enterprises</strong></span>
+            <span className="text-white/20 hidden sm:inline">•</span>
+            <span>Proprietor: <strong className="text-white/80">Salma Saifi</strong></span>
+            <span className="text-white/20 hidden sm:inline">•</span>
+            <span>GSTIN: <strong className="text-[#c9a87c]">06OXPPS0718P1ZD</strong></span>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0">

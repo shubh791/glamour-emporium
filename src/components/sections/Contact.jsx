@@ -55,10 +55,12 @@ export default function Contact() {
               Have a question before booking? Reach out directly and we&apos;ll help you with your visit.
             </p>
 
-            <div className="mt-6 pt-5 border-t border-white/10 flex items-center gap-3 text-xs font-mono text-[#eae6df]/60 tracking-wider uppercase">
+            <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-mono text-[#eae6df]/60 tracking-wider uppercase">
               <span>Jattal Road, Panipat</span>
               <span>•</span>
               <span className="text-[#c9a87c]">Unisex Salon</span>
+              <span className="text-white/20 hidden sm:inline">•</span>
+              <span className="text-[10.5px] text-white/40 font-sans normal-case">Operated by SS Enterprises (GSTIN: 06OXPPS0718P1ZD)</span>
             </div>
 
           </div>

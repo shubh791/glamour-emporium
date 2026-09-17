@@ -144,7 +144,7 @@ export default function Footer() {
         {/* ============================================================ */}
         {/* LEGAL POLICIES STRIP: Razorpay Compliant Onboarding Links   */}
         {/* ============================================================ */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-mono tracking-[0.14em] uppercase text-white/60">
             {(legalLinks || [
               { label: "Privacy Policy", href: "/privacy-policy" },
@@ -171,11 +171,32 @@ export default function Footer() {
         </div>
 
         {/* ============================================================ */}
+        {/* LEGAL BUSINESS ENTITY STRIP (Discreet KYC Compliance)        */}
+        {/* ============================================================ */}
+        <div className="py-2.5 px-3.5 bg-white/[0.02] border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-[10.5px] font-mono text-white/50">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Legal Business Name: <strong className="text-white/80">SS Enterprises</strong></span>
+            <span className="text-white/20 hidden sm:inline">•</span>
+            <span>Operating Brand: <strong className="text-white/80">Glamour Emporium Unisex Salon</strong></span>
+            <span className="text-white/20 hidden sm:inline">•</span>
+            <span>Proprietor: <strong className="text-white/80">Salma Saifi</strong></span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span>GSTIN:</span>
+            <span className="text-[#c9a87c] font-semibold tracking-wider">06OXPPS0718P1ZD</span>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
         {/* FOOTER BOTTOM BAR: Restrained Strip                          */}
         {/* ============================================================ */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono tracking-[0.16em] uppercase text-white/40 pt-4 border-t border-white/5">
-          <div>
-            © {currentYear} {business.name}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 text-center sm:text-left">
+            <span>© {currentYear} {business.name}</span>
+            <span className="text-white/20 hidden sm:inline">•</span>
+            <span className="text-[10px] text-white/40 lowercase first-letter:uppercase tracking-normal font-sans">
+              Glamour Emporium Unisex Salon is operated by SS Enterprises.
+            </span>
           </div>
 
           <div className="flex items-center gap-4">
