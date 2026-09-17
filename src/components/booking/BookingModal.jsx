@@ -685,7 +685,7 @@ export default function BookingModal() {
                         onChange={(e) => handleChange("name", e.target.value)}
                         placeholder="Your full name"
                         autoComplete="name"
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
+                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
                           errors.name
                             ? "border-[#df9b8a] focus:border-[#df9b8a]"
                             : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
@@ -717,7 +717,7 @@ export default function BookingModal() {
                         onChange={handlePhoneChange}
                         placeholder="10-digit mobile number"
                         autoComplete="tel"
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
+                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
                           errors.phone
                             ? "border-[#df9b8a] focus:border-[#df9b8a]"
                             : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
@@ -749,7 +749,7 @@ export default function BookingModal() {
                           disabled={isSelectedDateTuesday}
                           value={formData.category}
                           onChange={(e) => handleCategoryChange(e.target.value)}
-                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed ${
+                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed ${
                             errors.category
                               ? "border-[#df9b8a] focus:border-[#df9b8a]"
                               : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
@@ -798,7 +798,7 @@ export default function BookingModal() {
                           disabled={isSelectedDateTuesday || !formData.category}
                           value={formData.service}
                           onChange={(e) => handleChange("service", e.target.value)}
-                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
+                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
                             errors.service
                               ? "border-[#df9b8a] focus:border-[#df9b8a]"
                               : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
@@ -877,7 +877,7 @@ export default function BookingModal() {
                         }}
                         onChange={(e) => handleDateChange(e.target.value)}
                         style={{ colorScheme: "dark" }}
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
+                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
                           errors.date
                             ? "border-[#df9b8a] focus:border-[#df9b8a]"
                             : isSelectedDateTuesday
@@ -1058,7 +1058,7 @@ export default function BookingModal() {
                       value={formData.notes}
                       onChange={(e) => handleChange("notes", e.target.value)}
                       placeholder="Specific haircut style, beard length, hair texture details..."
-                      className="w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-sm font-sans p-3 border border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30 transition-colors focus:outline-none resize-none min-h-[64px] disabled:cursor-not-allowed"
+                      className="w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans p-3 border border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30 transition-colors focus:outline-none resize-none min-h-[64px] disabled:cursor-not-allowed"
                     />
                   </div>
 

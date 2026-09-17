@@ -40,7 +40,8 @@ export default function WhatsAppButton({
   return (
     <aside
       aria-label="WhatsApp customer support"
-      className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-40 select-none"
+      style={{ bottom: "max(16px, env(safe-area-inset-bottom, 16px))" }}
+      className="fixed right-3.5 sm:right-6 z-40 select-none"
     >
       <motion.a
         href={targetUrl}

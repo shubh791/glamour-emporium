@@ -11,6 +11,8 @@ import BrandMark from "@/components/ui/BrandMark";
 import InstagramIcon from "@/components/ui/InstagramIcon";
 import { BookingPromoDesktop, BookingPromoMobile } from "@/components/ui/BookingPromoStrip";
 
+const PROMO_STORAGE_KEY = "ge_promo_dismissed_until";
+
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -24,6 +26,28 @@ export default function Navbar() {
     { label: "Gallery", href: "/#showcase", number: "03" },
     { label: "Contact", href: "/#contact", number: "04" },
   ];
+
+  // Initialize promo dismissal state from localStorage (persists for 7 days)
+  useEffect(() => {
+    try {
+      const dismissedUntil = localStorage.getItem(PROMO_STORAGE_KEY);
+      if (dismissedUntil && Number(dismissedUntil) > Date.now()) {
+        setShowPromo(false);
+      }
+    } catch {
+      // localStorage safety
+    }
+  }, []);
+
+  const handleDismissPromo = () => {
+    setShowPromo(false);
+    try {
+      const expireTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      localStorage.setItem(PROMO_STORAGE_KEY, String(expireTime));
+    } catch {
+      // localStorage safety
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -68,8 +92,8 @@ export default function Navbar() {
             : "bg-transparent border-b border-white/10"
         }`}
       >
-        <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between transition-all duration-300 ${
-          isScrolled ? "py-2.5 sm:py-3 lg:py-3.5" : "py-3.5 sm:py-4 lg:py-5"
+        <div className={`mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 flex items-center justify-between transition-all duration-300 ${
+          isScrolled ? "py-2 sm:py-3 lg:py-3.5" : "py-3 sm:py-4 lg:py-5"
         }`}>
           
           {/* ============================================================ */}
@@ -103,15 +127,15 @@ export default function Navbar() {
           </div>
 
           {/* ============================================================ */}
-          {/* MOBILE BRAND (Left: Official Emblem + Brand Name)            */}
+          {/* MOBILE BRAND (Left: Official Emblem + Full Brand Name)       */}
           {/* ============================================================ */}
           <a
             href="/#hero"
-            className="flex lg:hidden items-center gap-2.5 sm:gap-3 min-w-0 flex-1 mr-2 group focus-visible:outline-none"
+            className="flex lg:hidden items-center gap-2 xs:gap-2.5 sm:gap-3 group focus-visible:outline-none shrink-0"
             aria-label={`${siteData.business.name} — Home`}
             onClick={() => setMobileMenuOpen(false)}
           >
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-[#0c0b0a] border border-[#c9a87c]/60 group-hover:border-[#c9a87c] shrink-0 transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+            <div className="relative w-8 h-8 xs:w-8.5 xs:h-8.5 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-[#0c0b0a] border border-[#c9a87c]/60 group-hover:border-[#c9a87c] shrink-0 transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
               <Image
                 src="/images/logo/logo-mark.webp"
                 alt="Glamour Emporium Official Emblem"
@@ -122,8 +146,8 @@ export default function Navbar() {
               />
             </div>
 
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <span className="font-serif font-light tracking-[0.14em] sm:tracking-[0.16em] uppercase text-[15px] sm:text-[16px] text-[#f5f2eb] group-hover:text-[#c9a87c] transition-colors block truncate whitespace-nowrap leading-tight">
+            <div className="flex items-center">
+              <span className="font-serif font-light tracking-[0.08em] xs:tracking-[0.11em] sm:tracking-[0.15em] uppercase text-[12.5px] xs:text-[13.5px] sm:text-[16px] text-[#f5f2eb] group-hover:text-[#c9a87c] transition-colors whitespace-nowrap leading-none">
                 GLAMOUR EMPORIUM
               </span>
             </div>
@@ -154,7 +178,7 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-3.5 pl-6 lg:pl-8 xl:pl-10">
             <BookingPromoDesktop
               showPromo={showPromo}
-              onDismiss={() => setShowPromo(false)}
+              onDismiss={handleDismissPromo}
             />
 
             <button
@@ -176,11 +200,11 @@ export default function Navbar() {
           {/* ============================================================ */}
           {/* MOBILE RIGHT CONTROLS: Compact BOOK CTA + Menu Trigger       */}
           {/* ============================================================ */}
-          <div className="flex lg:hidden items-center gap-2 shrink-0">
+          <div className="flex lg:hidden items-center gap-1.5 xs:gap-2 shrink-0">
             <button
               type="button"
               onClick={() => openBooking()}
-              className="inline-flex items-center gap-1 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-[0.14em] text-[#0c0b0a] bg-[#f5f2eb] hover:bg-[#c9a87c] transition-colors cursor-pointer min-h-[38px] shadow-sm"
+              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 xs:px-3 xs:py-2 text-[9.5px] xs:text-[10px] font-mono font-bold uppercase tracking-[0.12em] text-[#0c0b0a] bg-[#f5f2eb] hover:bg-[#c9a87c] transition-colors cursor-pointer min-h-[40px] shadow-sm"
               style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
               aria-label="Book a slot online"
             >
@@ -191,7 +215,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex items-center justify-center w-10 h-10 text-[#f5f2eb] border border-white/20 bg-black/40 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a87c] cursor-pointer shrink-0"
+              className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] text-[#f5f2eb] border border-white/20 bg-black/40 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a87c] cursor-pointer shrink-0"
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
             >
@@ -204,7 +228,7 @@ export default function Navbar() {
         {/* Mobile Compact 1-line Dismissible Offer Strip */}
         <BookingPromoMobile
           showPromo={showPromo}
-          onDismiss={() => setShowPromo(false)}
+          onDismiss={handleDismissPromo}
         />
       </motion.header>
 

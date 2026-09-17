@@ -206,7 +206,7 @@ export default function Hero() {
       ref={containerRef}
       id="hero"
       aria-labelledby="hero-title"
-      className="relative min-h-[100svh] w-full bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between overflow-hidden pt-24 pb-8 sm:pt-28 sm:pb-10 lg:pt-32 lg:pb-10"
+      className="relative min-h-[100dvh] w-full bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between overflow-hidden pt-20 pb-6 sm:pt-28 sm:pb-10 lg:pt-32 lg:pb-10"
     >
       {/* Background Ambient Lighting Glows */}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -216,7 +216,7 @@ export default function Hero() {
 
       {/* Main Hero Container */}
       <div className="relative z-10 mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 flex-1 flex flex-col justify-center my-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
           
           {/* ============================================================ */}
           {/* LEFT SIDE: Dominant Headline, Grounded Copy & Clear CTAs     */}
@@ -225,7 +225,7 @@ export default function Hero() {
             <div ref={copyRef}>
               
               {/* Category Kicker */}
-              <div className="hero-fade inline-flex items-center gap-2 mb-3 sm:mb-5">
+              <div className="hero-fade inline-flex items-center gap-2 mb-2.5 sm:mb-5">
                 <span className="h-[1px] w-6 bg-[#c9a87c]" />
                 <span className="text-[9px] sm:text-[10px] tracking-[0.28em] uppercase text-[#c9a87c] font-semibold">
                   HAIR • BEAUTY • GROOMING • PANIPAT
@@ -236,7 +236,7 @@ export default function Hero() {
               <h1
                 id="hero-title"
                 ref={headlineRef}
-                className="font-serif text-[clamp(3.15rem,11.5vw,8.5rem)] leading-[0.88] tracking-tighter uppercase font-light text-[#f5f2eb] my-1 select-none"
+                className="font-serif text-[clamp(2.85rem,10.5vw,8.5rem)] leading-[0.88] tracking-tighter uppercase font-light text-[#f5f2eb] my-1 select-none"
               >
                 <span className="block overflow-hidden py-1 -my-1">
                   <span className="hero-line-inner block text-[#f5f2eb]">OWN</span>
@@ -252,18 +252,18 @@ export default function Hero() {
               </h1>
 
               {/* Customer-Friendly Local Supporting Copy */}
-              <p className="hero-fade mt-4 sm:mt-6 max-w-lg text-sm sm:text-base text-[#eae6df] font-sans leading-relaxed">
+              <p className="hero-fade mt-3.5 sm:mt-6 max-w-lg text-[13.5px] sm:text-base text-[#eae6df] font-sans leading-relaxed">
                 Glamour Emporium is a unisex salon on Jattal Road, Panipat, offering hair, beauty and grooming services for men and women. Conveniently located near Choudhary Hospital, with easy access from Model Town and nearby areas.
               </p>
 
               {/* CTAs: Guaranteed High Contrast & Visible Text */}
-              <div className="hero-fade mt-7 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 sm:gap-5">
+              <div className="hero-fade mt-5 sm:mt-10 flex flex-col sm:flex-row items-start sm:items-center gap-3.5 sm:gap-5">
                 
                 {/* Primary CTA: Visible Ivory with Dark Text & Champagne Hover Sweep */}
                 <button
                   type="button"
                   onClick={() => openBooking()}
-                  className="relative group inline-flex items-center justify-center gap-3 px-8 py-4 text-xs font-bold uppercase tracking-[0.2em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] hover:shadow-[0_4px_30px_rgba(201,168,124,0.35)] min-h-[48px] w-full sm:w-auto text-center cursor-pointer"
+                  className="relative group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 sm:px-8 sm:py-4 text-xs font-bold uppercase tracking-[0.18em] sm:tracking-[0.2em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] hover:shadow-[0_4px_30px_rgba(201,168,124,0.35)] min-h-[48px] max-w-[260px] w-full sm:w-auto text-center cursor-pointer"
                   style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
                 >
                   <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
@@ -277,7 +277,7 @@ export default function Hero() {
                 {/* Secondary CTA: Explore Services link */}
                 <a
                   href="#services"
-                  className="inline-flex items-center justify-center sm:justify-start gap-2 px-4 py-3.5 text-xs font-medium uppercase tracking-[0.16em] text-[#eae6df] hover:text-white border-b border-white/20 hover:border-[#c9a87c] transition-all min-h-[48px]"
+                  className="inline-flex items-center justify-center sm:justify-start gap-2 px-3 py-2 text-xs font-medium uppercase tracking-[0.16em] text-[#eae6df] hover:text-white border-b border-white/20 hover:border-[#c9a87c] transition-all min-h-[40px] sm:min-h-[48px]"
                 >
                   <span>EXPLORE SERVICES</span>
                   <ArrowDown className="w-3.5 h-3.5" />
