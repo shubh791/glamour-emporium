@@ -139,8 +139,19 @@ export async function createRazorpayOrder({
  * @returns {boolean}
  */
 export function verifyRazorpayPaymentSignature({ orderId, paymentId, signature }) {
-  const { keySecret } = getRazorpayConfig();
+  const { keyId, keySecret } = getRazorpayConfig();
+
+  // Safe diagnostics in terminal only (never log secrets)
+  console.log("[Razorpay Diagnostics - Signature Verification]", {
+    hasKeyId: Boolean(keyId),
+    hasSecret: Boolean(keySecret),
+    receivedOrderId: orderId || null,
+    receivedPaymentId: paymentId || null,
+    hasSignature: Boolean(signature),
+  });
+
   if (!keySecret || !orderId || !paymentId || !signature) {
+    console.warn("[Razorpay Verification] Signature check failed: Missing secret or required payment parameters.");
     return false;
   }
 
@@ -150,12 +161,24 @@ export function verifyRazorpayPaymentSignature({ orderId, paymentId, signature }
       .update(`${orderId}|${paymentId}`)
       .digest("hex");
 
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, "utf-8"),
-      Buffer.from(signature, "utf-8")
-    );
+    const expectedBuf = Buffer.from(expectedSignature, "utf-8");
+    const signatureBuf = Buffer.from(signature, "utf-8");
+
+    if (expectedBuf.length !== signatureBuf.length) {
+      console.warn("[Razorpay Verification] Signature length mismatch.");
+      return false;
+    }
+
+    const isValid = crypto.timingSafeEqual(expectedBuf, signatureBuf);
+    if (!isValid) {
+      console.warn("[Razorpay Verification] Signature mismatch: Calculated HMAC does not match client signature.");
+    } else {
+      console.log("[Razorpay Verification] Signature verified successfully via HMAC SHA-256.");
+    }
+
+    return isValid;
   } catch (err) {
-    console.error("[Razorpay Signature Verification Error]", err);
+    console.error("[Razorpay Signature Verification Error]", err.message);
     return false;
   }
 }

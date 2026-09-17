@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import {
   verifyRazorpayPaymentSignature,
   fetchRazorpayPayment,
-  fetchRazorpayOrder,
+  getRazorpayConfig,
 } from "@/lib/razorpay";
 import { generateBookingCode, sanitizePhone } from "@/lib/bookingService";
 import { notifyConfirmedBooking } from "@/lib/notifications";
@@ -27,16 +27,33 @@ export async function POST(request) {
       notes,
     } = body || {};
 
+    const { keyId, keySecret, isConfigured } = getRazorpayConfig();
+
+    // Safe terminal diagnostics (never log secrets or sensitive payload values)
+    console.log("[Verify Route Diagnostics]", {
+      hasKeyId: Boolean(keyId),
+      hasSecret: Boolean(keySecret),
+      isConfigured,
+      receivedBookingCode: bookingCode || null,
+      receivedOrderId: razorpayOrderId || null,
+      receivedPaymentId: razorpayPaymentId || null,
+      hasSignature: Boolean(razorpaySignature),
+    });
+
     if (!razorpayOrderId || !razorpayPaymentId) {
       return NextResponse.json(
-        { error: "razorpayOrderId and razorpayPaymentId are required" },
+        {
+          success: false,
+          isConfirmed: false,
+          error: "Payment could not be verified. Missing payment reference.",
+        },
         { status: 400 }
       );
     }
 
     // 1. Cryptographic HMAC SHA256 Signature Verification
     let isSignatureValid = false;
-    if (razorpayOrderId && razorpayPaymentId && razorpaySignature) {
+    if (razorpaySignature) {
       isSignatureValid = verifyRazorpayPaymentSignature({
         orderId: razorpayOrderId,
         paymentId: razorpayPaymentId,
@@ -44,19 +61,24 @@ export async function POST(request) {
       });
     }
 
-    // 2. Direct Server API Fallback Check (if client signature wasn't provided or failed local test)
-    let isPaymentCaptured = isSignatureValid;
-    if (!isPaymentCaptured && razorpayPaymentId) {
+    // 2. Direct Server API Fallback Check (if signature failed or wasn't provided, double-check directly with Razorpay)
+    let isPaymentVerified = isSignatureValid;
+    if (!isPaymentVerified && isConfigured) {
       try {
+        console.log(`[Verify Route] Checking payment directly with Razorpay API for ${razorpayPaymentId}...`);
         const paymentData = await fetchRazorpayPayment(razorpayPaymentId);
         if (
           paymentData &&
           (paymentData.status === "captured" || paymentData.status === "authorized") &&
           paymentData.order_id === razorpayOrderId
         ) {
-          isPaymentCaptured = true;
+          isPaymentVerified = true;
           console.log(
-            `[Verify Route] Fallback API check confirmed payment ${razorpayPaymentId} for order ${razorpayOrderId}`
+            `[Verify Route] API direct check confirmed payment ${razorpayPaymentId} for order ${razorpayOrderId} (status: ${paymentData.status})`
+          );
+        } else {
+          console.warn(
+            `[Verify Route] Direct check failed. Status: ${paymentData?.status}, order: ${paymentData?.order_id}`
           );
         }
       } catch (fetchErr) {
@@ -64,12 +86,13 @@ export async function POST(request) {
       }
     }
 
-    if (!isPaymentCaptured) {
+    if (!isPaymentVerified) {
+      console.warn("[Verify Route] Payment verification rejected for order:", razorpayOrderId);
       return NextResponse.json(
         {
           success: false,
           isConfirmed: false,
-          error: "Payment could not be verified. Signature mismatch or payment not captured.",
+          error: "Payment could not be verified. Please try again.",
         },
         { status: 400 }
       );
@@ -89,6 +112,7 @@ export async function POST(request) {
     if (booking) {
       // If already confirmed in DB, return immediately
       if (booking.bookingStatus === "CONFIRMED" && booking.paymentStatus === "SUCCESS") {
+        console.log(`[Verify Route] Booking ${booking.bookingCode} was already confirmed.`);
         return NextResponse.json({
           success: true,
           isConfirmed: true,
@@ -108,7 +132,7 @@ export async function POST(request) {
         },
       });
     } else {
-      // 4. Create Confirmed Booking in Database upon verified payment
+      // 4. Create Confirmed Booking in Database ONLY AFTER verified payment
       const finalBookingCode = bookingCode || generateBookingCode();
       const cleanedPhone = sanitizePhone(phone);
 
@@ -133,7 +157,7 @@ export async function POST(request) {
       });
     }
 
-    console.log(`[Verify Route] Booking ${booking.bookingCode} CONFIRMED.`);
+    console.log(`[Verify Route] Booking ${booking.bookingCode} successfully CONFIRMED in database.`);
 
     // Send transactional confirmations
     try {
@@ -148,9 +172,13 @@ export async function POST(request) {
       booking,
     });
   } catch (err) {
-    console.error("[Verify Route] Booking verification error:", err);
+    console.error("[Verify Route] Unexpected error during booking confirmation:", err);
     return NextResponse.json(
-      { error: "Verification error", details: err.message },
+      {
+        success: false,
+        isConfirmed: false,
+        error: "Payment could not be verified. Please try again.",
+      },
       { status: 500 }
     );
   }
