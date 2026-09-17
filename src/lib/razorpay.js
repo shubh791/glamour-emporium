@@ -121,10 +121,19 @@ export async function createRazorpayOrder({
     };
   } catch (err) {
     console.error("[Razorpay Server PG Order Creation Exception]", err);
+
+    const isAuthError =
+      err.statusCode === 401 ||
+      err.error?.code === "BAD_REQUEST_ERROR" && err.error?.description === "Authentication failed";
+
+    const errorMessage = isAuthError
+      ? "Razorpay payment gateway authentication failed. Please verify active Key ID and Secret in your dashboard or .env.local file."
+      : (err.error?.description || err.message || "Failed to create Razorpay order");
+
     return {
       success: false,
-      error: err.error?.description || err.message || "Failed to create Razorpay order",
-      code: err.error?.code || "RAZORPAY_ORDER_FAILED",
+      error: errorMessage,
+      code: isAuthError ? "RAZORPAY_AUTH_FAILED" : (err.error?.code || "RAZORPAY_ORDER_FAILED"),
       details: err,
     };
   }
