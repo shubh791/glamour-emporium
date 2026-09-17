@@ -3,6 +3,7 @@
 import { BookingProvider } from "@/context/BookingContext";
 import BookingModal from "@/components/booking/BookingModal";
 import Navbar from "@/components/layout/Navbar";
+import PromoAnnouncementStrip from "@/components/ui/PromoAnnouncementStrip";
 import Hero from "@/components/sections/Hero";
 import Services from "@/components/sections/Services";
 import ServicesExperimental from "@/components/sections/ServicesExperimental";
@@ -38,6 +39,7 @@ export default function HomePage() {
 
         {/* Main Content Sections */}
         <main id="main-content" tabIndex={-1}>
+          <PromoAnnouncementStrip />
           <Hero />
           <SelectedServices />
           <Experience />
