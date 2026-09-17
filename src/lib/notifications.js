@@ -1,7 +1,6 @@
 import { formatDisplayDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 const SALON_PRIMARY_WHATSAPP = process.env.SALON_PRIMARY_WHATSAPP || "917495068282";
-const SALON_SECONDARY_WHATSAPP = process.env.SALON_SECONDARY_WHATSAPP || "918199081540";
 
 /**
  * Notification handler triggered when an appointment is CONFIRMED.
@@ -49,12 +48,8 @@ export async function notifyConfirmedBooking(booking) {
           phone: booking.phone,
           message: customerMessage,
         },
-        primarySalon: {
+        salon: {
           phone: SALON_PRIMARY_WHATSAPP,
-          message: staffAlertMessage,
-        },
-        secondarySalon: {
-          phone: SALON_SECONDARY_WHATSAPP,
           message: staffAlertMessage,
         },
       },

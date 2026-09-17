@@ -189,13 +189,10 @@ export const BOOKING_SLOTS = [
 // TODO: Connect to backend database / booking management API for live real-time slot availability.
 export const DEMO_UNAVAILABLE_SLOTS = ["12:00 PM", "04:00 PM"];
 
-// Centralized notification recipients for owner & staff alerts
-// TODO: Connect to official WhatsApp Business API / webhook notification endpoint on backend.
+// Centralized notification recipient for salon owner & staff alerts
 export const NOTIFICATION_RECIPIENTS = {
   primary: "+91 74950 68282",
   primaryRaw: "917495068282",
-  secondary: "+91 81990 81540",
-  secondaryRaw: "918199081540",
 };
 
 // Shared contact email placeholder — easy to replace when client provides domain mailbox
