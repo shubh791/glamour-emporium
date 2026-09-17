@@ -173,7 +173,7 @@ export default function RootLayout({ children }) {
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-[#0c0b0a] text-[#f5f2eb]">
         <SmoothScroll>{children}</SmoothScroll>
       </body>
     </html>

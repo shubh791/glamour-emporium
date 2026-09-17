@@ -85,10 +85,10 @@ export default function Navbar() {
         initial={prefersReducedMotion ? false : { y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-500 ${
+        className={`fixed top-0 left-0 right-0 z-50 w-full bg-[#090909]/98 backdrop-blur-md border-b border-[#c9a87c]/30 transition-all duration-300 ${
           isScrolled
-            ? "bg-[#0c0b0a]/95 backdrop-blur-md border-b border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
-            : "bg-transparent border-b border-white/10"
+            ? "shadow-[0_10px_30px_rgba(0,0,0,0.8)]"
+            : "shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
         }`}
       >
         <div className={`mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 flex items-center justify-between transition-all duration-300 ${
