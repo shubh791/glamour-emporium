@@ -206,7 +206,7 @@ export default function Hero() {
       ref={containerRef}
       id="hero"
       aria-labelledby="hero-title"
-      className="relative min-h-[calc(100dvh-100px)] sm:min-h-[calc(100dvh-112px)] lg:min-h-[calc(100dvh-116px)] w-full bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between overflow-hidden pt-4 pb-6 sm:pt-6 sm:pb-8 lg:pt-8 lg:pb-10"
+      className="relative min-h-[100dvh] w-full bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between overflow-hidden pt-20 pb-6 sm:pt-28 sm:pb-10 lg:pt-32 lg:pb-10"
     >
       {/* Background Ambient Lighting Glows */}
       <div className="absolute inset-0 pointer-events-none z-0">

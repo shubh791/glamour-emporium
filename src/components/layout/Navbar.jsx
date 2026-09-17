@@ -8,14 +8,11 @@ import { siteData } from "@/data/siteData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useBooking } from "@/context/BookingContext";
 import InstagramIcon from "@/components/ui/InstagramIcon";
-import { BookingPromoDesktop, BookingPromoMobileDrawer } from "@/components/ui/BookingPromoStrip";
-
-const PROMO_STORAGE_KEY = "ge_promo_dismissed_until";
+import { BookingPromoMobileDrawer } from "@/components/ui/BookingPromoStrip";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showPromo, setShowPromo] = useState(true);
   const prefersReducedMotion = useReducedMotion();
   const { openBooking } = useBooking();
 
@@ -25,28 +22,6 @@ export default function Navbar() {
     { label: "Gallery", href: "/#showcase", number: "03" },
     { label: "Contact", href: "/#contact", number: "04" },
   ];
-
-  // Initialize promo dismissal state from localStorage (persists for 7 days)
-  useEffect(() => {
-    try {
-      const dismissedUntil = localStorage.getItem(PROMO_STORAGE_KEY);
-      if (dismissedUntil && Number(dismissedUntil) > Date.now()) {
-        setShowPromo(false);
-      }
-    } catch {
-      // localStorage safety
-    }
-  }, []);
-
-  const handleDismissPromo = () => {
-    setShowPromo(false);
-    try {
-      const expireTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
-      localStorage.setItem(PROMO_STORAGE_KEY, String(expireTime));
-    } catch {
-      // localStorage safety
-    }
-  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -172,14 +147,9 @@ export default function Navbar() {
           </nav>
 
           {/* ============================================================ */}
-          {/* DESKTOP ACTION AREA (Right Column: Compact Badge + Book CTA) */}
+          {/* DESKTOP ACTION AREA (Right Column: Clean Book CTA Button)    */}
           {/* ============================================================ */}
-          <div className="hidden lg:flex items-center gap-3.5 pl-6 lg:pl-8 xl:pl-10">
-            <BookingPromoDesktop
-              showPromo={showPromo}
-              onDismiss={handleDismissPromo}
-            />
-
+          <div className="hidden lg:flex items-center pl-6 lg:pl-8 xl:pl-10">
             <button
               type="button"
               onClick={() => openBooking()}
@@ -272,8 +242,6 @@ export default function Navbar() {
 
               {/* Compact Promotional Offer Card at Bottom of Nav Links */}
               <BookingPromoMobileDrawer
-                showPromo={showPromo}
-                onDismiss={handleDismissPromo}
                 onSelectOffer={() => {
                   setMobileMenuOpen(false);
                   openBooking();
