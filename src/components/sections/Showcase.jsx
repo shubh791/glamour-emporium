@@ -42,11 +42,11 @@ import InstagramIcon from "@/components/ui/InstagramIcon";
 const galleryItems = [
   {
     id: "01",
-    label: "01 / LAYER",
-    title: "Layered Movement",
-    src: "/images/gallery/01-layered-haircut.webp",
-    alt: "Women's layered haircut and blow dry at Glamour Emporium salon in Panipat",
-    position: "50% 30%",
+    label: "01 / BRIDAL",
+    title: "Bridal Styling",
+    src: "/images/gallery/01-bridal-look.jpg",
+    alt: "Bridal makeup and traditional wedding styling at Glamour Emporium salon in Panipat",
+    position: "50% 20%",
   },
   {
     id: "02",
@@ -162,7 +162,7 @@ export default function Showcase() {
               </div>
               <div className="mt-3 flex items-baseline justify-between text-xs font-mono tracking-widest text-[#66685e]">
                 <span>{galleryItems[0].title}</span>
-                <span>VOLUMETRIC EDIT</span>
+                <span>BRIDAL EDIT</span>
               </div>
             </div>
 
