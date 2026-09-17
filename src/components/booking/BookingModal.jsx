@@ -347,24 +347,40 @@ export default function BookingModal() {
       });
 
       // 1. Create Razorpay Order on Server
-      const createRes = await fetch("/api/bookings/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerName: formData.name,
-          phone: formData.phone,
-          serviceCategory: formData.category,
-          service: formData.service,
-          bookingDate: formData.date,
-          bookingTime: formData.timeSlot,
-          notes: formData.notes,
-        }),
-      });
+      let createRes;
+      let createData = {};
+      try {
+        createRes = await fetch("/api/bookings/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerName: formData.name,
+            phone: formData.phone,
+            serviceCategory: formData.category,
+            service: formData.service,
+            bookingDate: formData.date,
+            bookingTime: formData.timeSlot,
+            notes: formData.notes,
+          }),
+        });
 
-      const createData = await createRes.json();
+        const rawText = await createRes.text();
+        try {
+          createData = JSON.parse(rawText);
+        } catch {
+          createData = { error: "Unable to start payment session. Please try again." };
+        }
+      } catch (fetchErr) {
+        console.error("[Razorpay Flow] Network error creating order:", fetchErr);
+        setPaymentErrorTitle("NETWORK ERROR");
+        setPaymentErrorMessage("Unable to connect to booking server. Please check your internet connection and try again.");
+        setPaymentStatus(PAYMENT_STATUS.FAILED);
+        setIsSubmitting(false);
+        return;
+      }
 
       console.log("[Razorpay Flow] 2. Server create order response:", {
-        httpStatus: createRes.status,
+        httpStatus: createRes?.status,
         success: Boolean(createData?.success),
         bookingCode: createData?.bookingCode,
         razorpayOrderId: createData?.razorpayOrderId,
@@ -372,7 +388,7 @@ export default function BookingModal() {
         details: createData?.details || null,
       });
 
-      if (!createRes.ok || !createData.success || !createData.razorpayOrderId) {
+      if (!createRes?.ok || !createData.success || !createData.razorpayOrderId) {
         const errorText =
           createData.error ||
           createData.details ||
@@ -462,7 +478,14 @@ export default function BookingModal() {
               }),
             });
 
-            const verifyData = await verifyRes.json();
+            let verifyData = {};
+            try {
+              const verifyRawText = await verifyRes.text();
+              verifyData = JSON.parse(verifyRawText);
+            } catch {
+              verifyData = { error: "Payment verification could not be completed. Please contact salon support." };
+            }
+
             console.log("[Razorpay Flow] Verification result:", verifyData);
 
             if (verifyData.isConfirmed || verifyData?.booking?.bookingStatus === "CONFIRMED") {
