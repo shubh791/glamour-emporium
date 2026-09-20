@@ -20,13 +20,13 @@ const editorialSerif = localFont({
 });
 
 export const metadata = {
-  metadataBase: new URL("https://glamouremporium.com"),
+  metadataBase: new URL("https://glamouremporiumsaloon.com"),
   title: {
-    default: "Glamour Emporium | Unisex Salon in Panipat",
+    default: "Glamour Emporium | Premium Unisex Salon in Panipat",
     template: "%s | Glamour Emporium",
   },
   description:
-    "Visit Glamour Emporium, a unisex salon on Jattal Road near Choudhary Hospital, Panipat, for hair styling, men's grooming, beauty and personal care services. Book your appointment online or connect on WhatsApp.",
+    "Experience premium hair, beauty and grooming services at Glamour Emporium, Jattal Road, Panipat. Explore our services and book your salon appointment online.",
   keywords: [
     "Glamour Emporium",
     "Glamour Emporium Unisex Salon",
@@ -41,7 +41,7 @@ export const metadata = {
     "Salon near Model Town Panipat",
     "Salon near Sat Kartar Nagar Panipat",
   ],
-  authors: [{ name: "Glamour Emporium", url: "https://glamouremporium.com" }],
+  authors: [{ name: "Glamour Emporium", url: "https://glamouremporiumsaloon.com" }],
   creator: "Glamour Emporium",
   publisher: "Glamour Emporium",
   formatDetection: {
@@ -57,9 +57,9 @@ export const metadata = {
     locale: "en_IN",
     url: "/",
     siteName: "Glamour Emporium",
-    title: "Glamour Emporium | Unisex Salon in Panipat",
+    title: "Glamour Emporium | Premium Unisex Salon in Panipat",
     description:
-      "Visit Glamour Emporium, a unisex salon on Jattal Road near Choudhary Hospital, Panipat, for hair styling, men's grooming, beauty and personal care services. Book your appointment online or connect on WhatsApp.",
+      "Experience premium hair, beauty and grooming services at Glamour Emporium, Jattal Road, Panipat. Explore our services and book your salon appointment online.",
     images: [
       {
         url: "/opengraph-image.png",
@@ -71,9 +71,9 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Glamour Emporium | Unisex Salon in Panipat",
+    title: "Glamour Emporium | Premium Unisex Salon in Panipat",
     description:
-      "Visit Glamour Emporium, a unisex salon on Jattal Road near Choudhary Hospital, Panipat, for hair styling, men's grooming, beauty and personal care services. Book your appointment online or connect on WhatsApp.",
+      "Experience premium hair, beauty and grooming services at Glamour Emporium, Jattal Road, Panipat. Explore our services and book your salon appointment online.",
     images: ["/opengraph-image.png"],
   },
   icons: {
@@ -93,14 +93,14 @@ export const metadata = {
 const salonStructuredData = {
   "@context": "https://schema.org",
   "@type": "BeautySalon",
-  "@id": "https://glamouremporium.com/#salon",
+  "@id": "https://glamouremporiumsaloon.com/#salon",
   "name": "Glamour Emporium",
   "alternateName": "Glamour Emporium Unisex Salon",
-  "image": "https://glamouremporium.com/opengraph-image.png",
-  "logo": "https://glamouremporium.com/images/logo/glamour-emporium-logo.png",
+  "image": "https://glamouremporiumsaloon.com/opengraph-image.png",
+  "logo": "https://glamouremporiumsaloon.com/images/logo/glamour-emporium-logo.png",
   "description":
     "Glamour Emporium is a unisex salon on Jattal Road, near Choudhary Hospital, Panipat, offering hair styling, men's grooming, and beauty care services.",
-  "url": "https://glamouremporium.com",
+  "url": "https://glamouremporiumsaloon.com",
   "telephone": "+917495068282",
   "address": {
     "@type": "PostalAddress",

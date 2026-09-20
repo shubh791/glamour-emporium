@@ -3,7 +3,7 @@
  * Generates dynamic sitemap.xml for Glamour Emporium Unisex Salon.
  */
 export default function sitemap() {
-  const baseUrl = "https://glamouremporium.com";
+  const baseUrl = "https://glamouremporiumsaloon.com";
   const lastModified = new Date().toISOString();
 
   return [

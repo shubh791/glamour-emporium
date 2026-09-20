@@ -1,4 +1,4 @@
-import { formatDisplayDate } from "@/data/bookingConfig";
+import { formatDisplayDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 /**
  * Generates official high-definition printable HTML receipt
@@ -367,11 +367,11 @@ export function generateReceiptHtml(booking) {
     <div class="amount-box">
       <div class="amount-row">
         <span class="amount-label">Appointment Advance Fee</span>
-        <span class="amount-value">₹${booking.amount || 99}.00</span>
+        <span class="amount-value">₹${booking.amount != null ? booking.amount : BOOKING_ADVANCE}.00</span>
       </div>
       <div class="amount-row total">
         <span class="amount-label">Total Amount Paid</span>
-        <span class="amount-value" style="color:#114b2d;">₹${booking.amount || 99}.00 ${booking.currency || "INR"}</span>
+        <span class="amount-value" style="color:#114b2d;">₹${booking.amount != null ? booking.amount : BOOKING_ADVANCE}.00 ${booking.currency || "INR"}</span>
       </div>
     </div>
 

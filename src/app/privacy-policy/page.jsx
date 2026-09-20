@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
             Welcome to <strong className="text-[#f5f2eb]">Glamour Emporium Unisex Salon</strong> (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the Salon&rdquo;), located at Jattal Road, Near Choudhary Hospital, Panipat, Haryana - 132103. We are committed to protecting your personal information and respecting your privacy rights.
           </p>
           <p>
-            This Privacy Policy applies to personal information gathered through our official website (<a href="https://glamouremporium.com" className="text-[#c9a87c] underline underline-offset-4">glamouremporium.com</a>), online appointment booking interfaces, WhatsApp concierge communication, telephone inquiries, and direct salon visits.
+            This Privacy Policy applies to personal information gathered through our official website (<a href="https://glamouremporiumsaloon.com" className="text-[#c9a87c] underline underline-offset-4">glamouremporiumsaloon.com</a>), online appointment booking interfaces, WhatsApp concierge communication, telephone inquiries, and direct salon visits.
           </p>
         </section>
 

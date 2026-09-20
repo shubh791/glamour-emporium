@@ -8,6 +8,7 @@ import { buildWhatsAppUrl } from "@/data/siteData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useBooking } from "@/context/BookingContext";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
+import { BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 const servicesData = [
   {
@@ -262,7 +263,7 @@ export default function Services() {
                                 <ArrowUpRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
                               </button>
                               <span className="text-[11px] font-mono text-[#66685e] tracking-tight">
-                                Reserve with ₹99 adjustable advance
+                                Reserve with ₹{BOOKING_ADVANCE} adjustable advance
                               </span>
                             </div>
                           </div>

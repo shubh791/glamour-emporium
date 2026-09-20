@@ -8,6 +8,7 @@ import styles from "./ServicesExperimental.module.css";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useBooking } from "@/context/BookingContext";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
+import { BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 const servicesData = [
   {
@@ -255,7 +256,7 @@ export default function ServicesExperimental() {
                                 <span>BOOK A SLOT</span>
                                 <ArrowUpRight size={17} aria-hidden="true" />
                               </button>
-                              <p className={styles.advance}>Reserve with ₹99 adjustable advance</p>
+                              <p className={styles.advance}>Reserve with ₹{BOOKING_ADVANCE} adjustable advance</p>
                             </div>
                           </motion.div>
                         </motion.div>

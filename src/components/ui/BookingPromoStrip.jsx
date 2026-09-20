@@ -2,6 +2,7 @@
 
 import { useBooking } from "@/context/BookingContext";
 import { Sparkles } from "lucide-react";
+import { BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 /**
  * Mobile Drawer Compact Luxury Promo Card
@@ -56,7 +57,7 @@ export function BookingPromoMobileDrawer({ onSelectOffer }) {
       {/* Pricing / Adjustment Subtitle */}
       <div className="mt-1.5 flex items-center justify-between">
         <span className="font-mono text-[10.5px] xs:text-[11px] text-[#c9a87c] tracking-[0.08em] font-medium">
-          ₹99 advance adjusted in final bill
+          ₹{BOOKING_ADVANCE} advance adjusted in final bill
         </span>
         <span className="font-mono text-[9.5px] xs:text-[10px] uppercase font-bold tracking-[0.14em] text-[#0c0b0a] bg-[#c9a87c] group-hover:bg-[#dfc49c] px-2 py-0.5 transition-colors">
           BOOK ↗

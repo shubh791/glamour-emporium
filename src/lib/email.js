@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import prisma from "@/lib/prisma";
-import { formatDisplayDate } from "@/data/bookingConfig";
+import { formatDisplayDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 const SALON_OWNER_EMAIL = process.env.SALON_OWNER_EMAIL || "salmasaifi0888@gmail.com";
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Glamour Emporium <onboarding@resend.dev>";
@@ -83,7 +83,7 @@ Mobile Number: +91 ${booking.phone}
 Service: ${serviceDisplay}
 Appointment Date: ${formattedDate}
 Time Slot: ${booking.bookingTime}
-Advance Amount Paid: ₹${booking.amount || 99} INR
+Advance Amount Paid: ₹${booking.amount != null ? booking.amount : BOOKING_ADVANCE} INR
 Payment Status: SUCCESS (CONFIRMED)
 Razorpay Order ID: ${booking.razorpayOrderId || "N/A"}
 Razorpay Payment ID: ${booking.razorpayPaymentId || "N/A"}
@@ -123,7 +123,7 @@ Operating Brand: Glamour Emporium Unisex Salon (SS Enterprises)
     </div>
     <div class="content">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span class="badge">₹${booking.amount || 99} ADVANCE PAID</span>
+        <span class="badge">₹${booking.amount != null ? booking.amount : BOOKING_ADVANCE} ADVANCE PAID</span>
         <span style="font-family: monospace; font-size: 12px; color: #aaa;">${formattedCreatedAt}</span>
       </div>
 
@@ -155,7 +155,7 @@ Operating Brand: Glamour Emporium Unisex Salon (SS Enterprises)
         </tr>
         <tr>
           <td class="label">Advance Paid</td>
-          <td class="value" style="color: #2d8f58; font-weight: bold;">₹${booking.amount || 99}.00 (Bill Adjusted)</td>
+          <td class="value" style="color: #2d8f58; font-weight: bold;">₹${booking.amount != null ? booking.amount : BOOKING_ADVANCE}.00 (Bill Adjusted)</td>
         </tr>
         ${booking.notes ? `
         <tr>

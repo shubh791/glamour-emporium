@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
+import { BOOKING_ADVANCE } from "@/data/bookingConfig";
 
 /**
  * Returns active Razorpay configuration from environment variables
@@ -56,7 +57,7 @@ export function getRazorpayInstance() {
  */
 export async function createRazorpayOrder({
   bookingCode,
-  orderAmount = 99,
+  orderAmount = BOOKING_ADVANCE,
   customerDetails = {},
   notes = {},
 }) {

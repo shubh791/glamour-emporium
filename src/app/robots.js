@@ -3,7 +3,7 @@
  * Configures search engine crawlers and points to the canonical sitemap.
  */
 export default function robots() {
-  const baseUrl = "https://glamouremporium.com";
+  const baseUrl = "https://glamouremporiumsaloon.com";
 
   return {
     rules: {

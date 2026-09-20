@@ -19,7 +19,7 @@ import {
   Receipt,
   CalendarCheck,
 } from "lucide-react";
-import { sanitizePhone, isValidPhone, formatDisplayDate } from "@/data/bookingConfig";
+import { sanitizePhone, isValidPhone, formatDisplayDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 import { siteData } from "@/data/siteData";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
@@ -264,7 +264,7 @@ export default function FindBookingPage() {
                       </div>
                       <div>
                         <span className="text-white/40 block text-[9px] uppercase tracking-wider">Advance Paid</span>
-                        <span className="text-[#c9a87c] font-bold">₹{b.amount || 99} INR</span>
+                        <span className="text-[#c9a87c] font-bold">₹{b.amount != null ? b.amount : BOOKING_ADVANCE} INR</span>
                       </div>
                       <div>
                         <span className="text-white/40 block text-[9px] uppercase tracking-wider">Service</span>
