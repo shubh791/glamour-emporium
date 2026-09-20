@@ -170,16 +170,15 @@ export default function ServicesExperimentalV3() {
   const preview = cinematic && previewId !== activeId && !isOpen
     ? servicesData.find((service) => service.id === previewId)
     : null;
-  const highlightedId = preview?.id || activeId;
+  const highlightedId = isOpen ? activeId : (preview?.id || activeId);
   const categoryBooking = bookingOption(active.title, active.title);
   const stageTitle = getStageTitleParts(active.title);
 
-  // Freeze parallax and hover previews completely when BookingModal is open
+  // Freeze parallax motion when BookingModal is open
   useEffect(() => {
     if (isOpen) {
       xTarget.set(0);
       yTarget.set(0);
-      setPreviewId(null);
     }
   }, [isOpen, xTarget, yTarget]);
 
