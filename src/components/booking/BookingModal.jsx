@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId, useRef, useCallback } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,20 +12,18 @@ import {
   Clock,
   Phone,
   User,
-  Sparkles,
   AlertCircle,
   ShieldCheck,
   CreditCard,
   Loader2,
-  RotateCcw,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { useBooking } from "@/context/BookingContext";
 import {
   BOOKING_ADVANCE,
   BOOKING_CATALOGUE,
-  BOOKING_SERVICES,
   BOOKING_SLOTS,
-  ONLINE_BOOKING_OFFER,
   PAYMENT_STATUS,
   getServicesForCategory,
   normalizeServiceName,
@@ -65,20 +63,19 @@ function loadRazorpayScript() {
   });
 }
 
-export default function BookingModal() {
-  const { isOpen, bookingPayload, closeBooking } = useBooking();
+function BookingModalInner({ bookingPayload, closeBooking }) {
   const prefersReducedMotion = useReducedMotion();
   const titleId = useId();
   const dateInputRef = useRef(null);
   const scrollAreaRef = useRef(null);
   const modalShellRef = useRef(null);
 
-  // Form State
+  // Form State initialized from payload
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
-    category: "",
-    service: "",
+    category: bookingPayload?.category || "",
+    service: bookingPayload?.service || "",
     date: "",
     timeSlot: "",
     notes: "",
@@ -99,58 +96,70 @@ export default function BookingModal() {
   // Today string for min attribute in date picker (Asia/Kolkata)
   const todayKolkataString = getTodayKolkataString();
 
-  // Fetch live slot availability for chosen date
-  const fetchAvailability = useCallback(async (dateStr) => {
-    if (!dateStr || isTuesday(dateStr) || isPastDate(dateStr)) {
-      setSlotsState([]);
+  // Load slot availability when date changes
+  useEffect(() => {
+    let ignore = false;
+
+    if (!formData.date || isTuesday(formData.date) || isPastDate(formData.date)) {
       return;
     }
 
+    const loadSlots = async () => {
+      setIsLoadingSlots(true);
+      try {
+        const res = await fetch(`/api/bookings/availability?date=${encodeURIComponent(formData.date)}`);
+        const data = await res.json();
+        if (!ignore) {
+          if (data.success && Array.isArray(data.slots)) {
+            setSlotsState(data.slots);
+            // Automatically clear selected slot if it became full
+            setFormData((prev) => {
+              if (prev.timeSlot) {
+                const chosen = data.slots.find((s) => s.slot === prev.timeSlot);
+                if (chosen && (chosen.available === false || chosen.remainingSeats <= 0)) {
+                  return { ...prev, timeSlot: "" };
+                }
+              }
+              return prev;
+            });
+          } else {
+            setSlotsState([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load availability:", err);
+        if (!ignore) setSlotsState([]);
+      } finally {
+        if (!ignore) setIsLoadingSlots(false);
+      }
+    };
+
+    loadSlots();
+
+    return () => {
+      ignore = true;
+    };
+  }, [formData.date]);
+
+  // Manual refresh helper
+  const refreshAvailability = async (targetDate) => {
+    if (!targetDate || isTuesday(targetDate) || isPastDate(targetDate)) return;
     setIsLoadingSlots(true);
     try {
-      const res = await fetch(`/api/bookings/availability?date=${encodeURIComponent(dateStr)}`);
+      const res = await fetch(`/api/bookings/availability?date=${encodeURIComponent(targetDate)}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.slots)) {
         setSlotsState(data.slots);
-      } else {
-        setSlotsState([]);
       }
     } catch (err) {
-      console.error("Failed to load availability:", err);
-      setSlotsState([]);
+      console.error("Failed to refresh availability:", err);
     } finally {
       setIsLoadingSlots(false);
     }
-  }, []);
-
-  // Sync pre-selected category/service & reset states when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setFormData((prev) => ({
-        ...prev,
-        category: bookingPayload?.category || "",
-        service: bookingPayload?.service || "",
-      }));
-      setStep(1);
-      setErrors({});
-      setPaymentStatus(PAYMENT_STATUS.IDLE);
-      setPaymentErrorMessage("");
-      setTransactionRef("");
-      setIsSubmitting(false);
-    }
-  }, [isOpen, bookingPayload]);
-
-  // Fetch availability when date changes
-  useEffect(() => {
-    if (formData.date) {
-      fetchAvailability(formData.date);
-    }
-  }, [formData.date, fetchAvailability]);
+  };
 
   // Lock document/body scroll and freeze background when modal is open
   useEffect(() => {
-    if (!isOpen) return;
-
     // 1. Pause Lenis smooth-scroll instance for background page
     if (typeof window !== "undefined" && window.__lenis) {
       try {
@@ -210,7 +219,7 @@ export default function BookingModal() {
         }
       }
     };
-  }, [isOpen, paymentStatus, closeBooking]);
+  }, [paymentStatus, closeBooking]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => {
@@ -223,16 +232,13 @@ export default function BookingModal() {
     }
   };
 
-  const handlePhoneChange = (e) => {
-    const raw = e.target.value;
-    const clean = sanitizePhone(raw);
-    setFormData((prev) => ({ ...prev, phone: clean }));
-    if (errors.phone) {
-      setErrors((prev) => ({ ...prev, phone: "" }));
-    }
+  const handlePhoneInputChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+    handleChange("phone", raw);
   };
 
   const handleDateChange = (newDate) => {
+    setSlotsState([]); // Reset slot state on new date selection
     setFormData((prev) => {
       const updated = { ...prev, date: newDate };
       // When date changes, immediately clear any previously selected invalid/past slot
@@ -280,8 +286,13 @@ export default function BookingModal() {
     }
 
     const cleanPhone = sanitizePhone(formData.phone);
-    if (!formData.phone.trim() || !isValidPhone(cleanPhone)) {
-      newErrors.phone = "Enter a valid 10-digit mobile number.";
+    if (!cleanPhone) {
+      newErrors.phone = "Mobile number is required.";
+    } else if (cleanPhone.length < 10) {
+      const remaining = 10 - cleanPhone.length;
+      newErrors.phone = `Enter the remaining ${remaining} digit${remaining > 1 ? "s" : ""}.`;
+    } else if (!isValidPhone(cleanPhone)) {
+      newErrors.phone = "Enter a valid 10-digit Indian mobile number.";
     }
 
     if (!formData.category) {
@@ -302,6 +313,11 @@ export default function BookingModal() {
       }
     } else if (formData.date && !isSlotAvailableTimeWise(formData.date, formData.timeSlot, 15)) {
       newErrors.timeSlot = "This time slot is no longer available today";
+    } else if (slotsState.length > 0) {
+      const chosen = slotsState.find((s) => s.slot === formData.timeSlot);
+      if (chosen && (chosen.available === false || chosen.remainingSeats <= 0)) {
+        newErrors.timeSlot = "This time slot just became full. Please select another time.";
+      }
     }
 
     setErrors(newErrors);
@@ -339,11 +355,14 @@ export default function BookingModal() {
     setPaymentErrorMessage("");
     setPaymentErrorTitle("PAYMENT COULD NOT START");
 
+    const cleanPhone = sanitizePhone(formData.phone);
+
     try {
       console.log("[Razorpay Flow] 1. Requesting order creation for:", {
         date: formData.date,
         timeSlot: formData.timeSlot,
         category: formData.category,
+        phone: cleanPhone,
       });
 
       // 1. Create Razorpay Order on Server
@@ -354,8 +373,8 @@ export default function BookingModal() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            customerName: formData.name,
-            phone: formData.phone,
+            customerName: formData.name.trim(),
+            customerPhone: cleanPhone,
             serviceCategory: formData.category,
             service: formData.service,
             bookingDate: formData.date,
@@ -385,8 +404,24 @@ export default function BookingModal() {
         bookingCode: createData?.bookingCode,
         razorpayOrderId: createData?.razorpayOrderId,
         error: createData?.error || null,
-        details: createData?.details || null,
+        code: createData?.code || null,
       });
+
+      // Handle Slot Full Conflict (HTTP 409) during Order Creation
+      if (createRes?.status === 409 || createData.code === "SLOT_FULL" || createData.code === "SLOT_UNAVAILABLE") {
+        setStep(1); // Return back to slot selection
+        setFormData((prev) => ({ ...prev, timeSlot: "" }));
+        setErrors((prev) => ({
+          ...prev,
+          timeSlot: createData.error || "This time slot just became full. Please select another time.",
+        }));
+        setPaymentStatus(PAYMENT_STATUS.IDLE);
+        setIsSubmitting(false);
+        if (formData.date) {
+          refreshAvailability(formData.date);
+        }
+        return;
+      }
 
       if (!createRes?.ok || !createData.success || !createData.razorpayOrderId) {
         const errorText =
@@ -396,15 +431,16 @@ export default function BookingModal() {
         setPaymentErrorTitle(
           createData.code === "RAZORPAY_KEYS_NOT_CONFIGURED"
             ? "RAZORPAY SETUP REQUIRED"
+            : createData.code === "INVALID_PHONE"
+            ? "INVALID PHONE NUMBER"
             : "PAYMENT COULD NOT START"
         );
         setPaymentErrorMessage(errorText);
         setPaymentStatus(PAYMENT_STATUS.FAILED);
         setIsSubmitting(false);
 
-        // If slot conflict, refresh availability
-        if (createData.code === "SLOT_UNAVAILABLE") {
-          fetchAvailability(formData.date);
+        if (formData.date) {
+          refreshAvailability(formData.date);
         }
         return;
       }
@@ -434,8 +470,8 @@ export default function BookingModal() {
         image: "/images/logo/logo-mark.webp",
         order_id: razorpayOrderId,
         prefill: {
-          name: formData.name,
-          contact: formData.phone,
+          name: formData.name.trim(),
+          contact: cleanPhone ? `+91${cleanPhone}` : "",
         },
         theme: {
           color: "#c9a87c",
@@ -468,8 +504,8 @@ export default function BookingModal() {
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
                 razorpaySignature: response.razorpay_signature,
-                customerName: formData.name,
-                phone: formData.phone,
+                customerName: formData.name.trim(),
+                customerPhone: cleanPhone,
                 serviceCategory: formData.category,
                 service: formData.service,
                 bookingDate: formData.date,
@@ -487,6 +523,26 @@ export default function BookingModal() {
             }
 
             console.log("[Razorpay Flow] Verification result:", verifyData);
+
+            // Handle Slot Full Conflict during Payment Verification
+            if (verifyRes?.status === 409 || verifyData.code === "SLOT_FULL" || verifyData.code === "SLOT_UNAVAILABLE") {
+              setStep(1); // Return back to slot selection
+              setFormData((prev) => ({ ...prev, timeSlot: "" }));
+              setErrors((prev) => ({
+                ...prev,
+                timeSlot: verifyData.error || "This time slot just became full. Please select another time.",
+              }));
+              setPaymentStatus(PAYMENT_STATUS.FAILED);
+              setPaymentErrorTitle("SLOT NO LONGER AVAILABLE");
+              setPaymentErrorMessage(
+                verifyData.error || "This time slot just became full. Please select another time."
+              );
+              setIsSubmitting(false);
+              if (formData.date) {
+                refreshAvailability(formData.date);
+              }
+              return;
+            }
 
             if (verifyData.isConfirmed || verifyData?.booking?.bookingStatus === "CONFIRMED") {
               setTransactionRef(bookingCode);
@@ -538,7 +594,11 @@ export default function BookingModal() {
   };
 
   const handleOpenWhatsAppConfirmation = () => {
-    const url = buildCustomerConfirmationWhatsAppUrl(formData);
+    const url = buildCustomerConfirmationWhatsAppUrl({
+      ...formData,
+      phone: formData.phone,
+      bookingCode: transactionRef,
+    });
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -547,823 +607,703 @@ export default function BookingModal() {
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div
-          data-lenis-prevent="true"
-          data-lenis-prevent
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-        >
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            onClick={paymentStatus === PAYMENT_STATUS.PROCESSING ? undefined : closeBooking}
-            className="fixed inset-0 bg-black/85 backdrop-blur-md z-0 cursor-pointer"
-            aria-hidden="true"
-          />
+    <div
+      data-lenis-prevent="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      {/* Backdrop (Non-closing on outside/sideways click) */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        className="fixed inset-0 bg-black/85 backdrop-blur-md z-0 select-none pointer-events-auto"
+        aria-hidden="true"
+      />
 
-          {/* Modal Container Shell */}
-          <motion.div
-            ref={modalShellRef}
-            data-lenis-prevent="true"
-            data-lenis-prevent
-            onWheel={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            initial={
-              prefersReducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: 0.96, y: 16 }
-            }
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={
-              prefersReducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: 0.96, y: 16 }
-            }
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 w-full max-w-xl max-h-[90dvh] sm:max-h-[92dvh] bg-[#121110] text-[#f5f2eb] border border-white/15 shadow-[0_25px_60px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden rounded-none my-auto"
-          >
-            {/* Modal Header Bar (Fixed / Sticky at top) */}
-            <div className="shrink-0 z-20 flex items-center justify-between px-5 sm:px-7 py-3.5 border-b border-white/10 bg-[#0c0b0a]">
-              <div className="flex items-center gap-2.5">
-                <div className="relative w-6 h-6 rounded-full overflow-hidden border border-[#c9a87c]/50 shrink-0">
-                  <Image
-                    src="/images/logo/logo-mark.webp"
-                    alt="GE Emblem"
-                    fill
-                    sizes="24px"
-                    className="object-cover"
-                  />
-                </div>
-                <div>
-                  <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#c9a87c] block font-semibold">
-                    GLAMOUR EMPORIUM
-                  </span>
-                  <span id={titleId} className="font-serif text-sm sm:text-base text-[#f5f2eb] font-light">
-                    {step === 1 && "BOOK YOUR VISIT"}
-                    {step === 2 && "YOUR APPOINTMENT"}
-                    {step === 3 && "BOOKING CONFIRMED"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              {paymentStatus !== PAYMENT_STATUS.PROCESSING && (
-                <button
-                  type="button"
-                  onClick={closeBooking}
-                  aria-label="Close booking modal"
-                  className="w-8 h-8 rounded-[2px] flex items-center justify-center border border-white/15 text-white/70 hover:text-white hover:border-[#c9a87c] transition-colors cursor-pointer focus-visible:outline-none"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+      {/* Modal Container Shell */}
+      <motion.div
+        ref={modalShellRef}
+        data-lenis-prevent="true"
+        onClick={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        initial={
+          prefersReducedMotion
+            ? { opacity: 0 }
+            : { opacity: 0, scale: 0.96, y: 16 }
+        }
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={
+          prefersReducedMotion
+            ? { opacity: 0 }
+            : { opacity: 0, scale: 0.96, y: 16 }
+        }
+        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-xl max-h-[90dvh] sm:max-h-[92dvh] bg-[#121110] text-[#f5f2eb] border border-[#c9a87c]/35 shadow-[0_25px_60px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden rounded-[2px] my-auto"
+      >
+        {/* Modal Header Bar (Fixed / Sticky at top) */}
+        <div className="shrink-0 z-20 flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-white/10 bg-[#0c0b0a]">
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-6 h-6 rounded-full overflow-hidden border border-[#c9a87c]/60 shrink-0">
+              <Image
+                src="/images/logo/logo-mark.webp"
+                alt="GE Emblem"
+                fill
+                sizes="24px"
+                className="object-cover"
+              />
             </div>
-
-            {/* Advance Explanation Banner (Sticky directly below header) */}
-            <div className="shrink-0 z-10 bg-[#1a1815] border-b border-[#c9a87c]/20 px-5 sm:px-7 py-2 flex items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 min-w-0">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#c9a87c] shrink-0" />
-                <p className="text-[11px] sm:text-xs font-mono text-[#eae6df] leading-tight truncate">
-                  <span className="text-[#c9a87c] font-semibold">₹{BOOKING_ADVANCE} ADVANCE:</span>{" "}
-                  Adjusted against your final salon bill.
-                </p>
-              </div>
-              <span className="font-mono text-[10px] uppercase text-[#c9a87c] tracking-wider shrink-0 hidden sm:inline">
-                NO EXTRA CHARGE
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#c9a87c] block font-semibold">
+                GLAMOUR EMPORIUM
+              </span>
+              <span id={titleId} className="font-serif text-sm sm:text-base text-[#f5f2eb] font-light">
+                {step === 1
+                  ? "BOOK YOUR VISIT"
+                  : step === 2
+                  ? "YOUR APPOINTMENT"
+                  : "BOOKING CONFIRMED"}
               </span>
             </div>
+          </div>
 
-            {/* Scrollable Content Body (The ONLY area that scrolls) */}
-            <div
-              ref={scrollAreaRef}
-              data-lenis-prevent="true"
-              data-lenis-prevent
-              onWheel={(e) => e.stopPropagation()}
-              onTouchMove={(e) => e.stopPropagation()}
-              className="modal-scroll-area flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-5 sm:p-7 space-y-5"
-              style={{
-                flex: "1 1 0%",
-                minHeight: 0,
-                overflowY: "auto",
-                overflowX: "hidden",
-                WebkitOverflowScrolling: "touch",
-                overscrollBehavior: "contain",
-                touchAction: "pan-y",
-              }}
+          {/* Close Button */}
+          {paymentStatus !== PAYMENT_STATUS.PROCESSING && (
+            <button
+              type="button"
+              onClick={closeBooking}
+              aria-label="Close booking modal"
+              className="w-8 h-8 rounded-[2px] flex items-center justify-center border border-white/15 text-white/70 hover:text-white hover:border-[#c9a87c] transition-colors cursor-pointer focus-visible:outline-none"
             >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Advance Explanation Banner (Sticky directly below header) */}
+        <div className="shrink-0 z-10 bg-[#181614] border-b border-[#c9a87c]/25 px-5 sm:px-6 py-2 flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#c9a87c] shrink-0" />
+            <p className="text-[11px] sm:text-xs font-mono text-[#eae6df] leading-tight truncate">
+              <span className="text-[#c9a87c] font-semibold">₹{BOOKING_ADVANCE} ADVANCE:</span>{" "}
+              Adjusted against final salon bill.
+            </p>
+          </div>
+          <span className="font-mono text-[9.5px] uppercase text-[#c9a87c] tracking-wider shrink-0 hidden sm:inline">
+            NO EXTRA CHARGE
+          </span>
+        </div>
+
+        {/* Scrollable Content Body */}
+        <div
+          ref={scrollAreaRef}
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          className="modal-scroll-area flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-5 sm:p-7 space-y-5"
+          style={{
+            flex: "1 1 0%",
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
+            touchAction: "pan-y",
+          }}
+        >
+          
+          {/* ============================================================ */}
+          {/* STEP 1: Details & Slot Selection Form                        */}
+          {/* ============================================================ */}
+          {step === 1 && (
+            <form onSubmit={handleProceedToReview} noValidate className="space-y-4 sm:space-y-4.5">
               
-              {/* ============================================================ */}
-              {/* STEP 1: Details & Slot Selection Form                        */}
-              {/* ============================================================ */}
-              {step === 1 && (
-                <form onSubmit={handleProceedToReview} noValidate className="space-y-4 sm:space-y-4.5">
-                  
-                  {/* Row 1: Name & Phone Number (Preserved & Visually Locked if Tuesday) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-                    
-                    {/* Full Name */}
-                    <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
-                      <label
-                        htmlFor="booking-name"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
-                      >
-                        <User className="w-3 h-3 text-[#c9a87c]" />
-                        <span>Full Name <span className="text-[#c9a87c]">*</span></span>
-                      </label>
-                      <input
-                        id="booking-name"
-                        type="text"
-                        disabled={isSelectedDateTuesday}
-                        value={formData.name}
-                        onChange={(e) => handleChange("name", e.target.value)}
-                        placeholder="Your full name"
-                        autoComplete="name"
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
-                          errors.name
-                            ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                            : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                        }`}
-                      />
-                      {errors.name && !isSelectedDateTuesday && (
-                        <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                          {errors.name}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Phone Number */}
-                    <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
-                      <label
-                        htmlFor="booking-phone"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
-                      >
-                        <Phone className="w-3 h-3 text-[#c9a87c]" />
-                        <span>Phone Number <span className="text-[#c9a87c]">*</span></span>
-                      </label>
-                      <input
-                        id="booking-phone"
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={10}
-                        disabled={isSelectedDateTuesday}
-                        value={formData.phone}
-                        onChange={handlePhoneChange}
-                        placeholder="10-digit mobile number"
-                        autoComplete="tel"
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none disabled:cursor-not-allowed ${
-                          errors.phone
-                            ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                            : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                        }`}
-                      />
-                      {errors.phone && !isSelectedDateTuesday && (
-                        <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                          {errors.phone}
-                        </span>
-                      )}
-                    </div>
-
-                  </div>
-
-                  {/* Row 2: Service Category & Specific Service */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-                    
-                    {/* 1. Service Category */}
-                    <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
-                      <label
-                        htmlFor="booking-category"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center justify-between"
-                      >
-                        <span>SERVICE CATEGORY <span className="text-[#c9a87c]">*</span></span>
-                      </label>
-                      <div className="relative">
-                        <select
-                          id="booking-category"
-                          disabled={isSelectedDateTuesday}
-                          value={formData.category}
-                          onChange={(e) => handleCategoryChange(e.target.value)}
-                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed ${
-                            errors.category
-                              ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                              : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                          }`}
-                        >
-                          <option value="" className="bg-[#141312] text-[#eae6df]/50">
-                            Choose Category...
-                          </option>
-                          {BOOKING_CATALOGUE.map((cat) => (
-                            <option key={cat.id} value={cat.category} className="bg-[#141312] text-[#f5f2eb]">
-                              {cat.category}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#c9a87c]/70">
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                        </div>
-                      </div>
-                      {errors.category && !isSelectedDateTuesday && (
-                        <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                          {errors.category}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 2. Specific Service */}
-                    <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
-                      <div className="flex items-center justify-between">
-                        <label
-                          htmlFor="booking-service"
-                          className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85"
-                        >
-                          SERVICE
-                        </label>
-                        {formData.category && (
-                          <span className="text-[9px] font-mono text-[#eae6df]/50 uppercase">
-                            Optional
-                          </span>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <select
-                          id="booking-service"
-                          disabled={isSelectedDateTuesday || !formData.category}
-                          value={formData.service}
-                          onChange={(e) => handleChange("service", e.target.value)}
-                          className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
-                            errors.service
-                              ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                              : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                          }`}
-                        >
-                          {!formData.category ? (
-                            <option value="" className="bg-[#141312] text-[#eae6df]/50">
-                              Select Category First
-                            </option>
-                          ) : (
-                            <>
-                              <option value="" className="bg-[#141312] text-[#eae6df]/60">
-                                General / Consultation or Choose Service...
-                              </option>
-                              {getServicesForCategory(formData.category).map((srv) => (
-                                <option key={srv.name} value={srv.name} className="bg-[#141312] text-[#f5f2eb]">
-                                  {srv.name}
-                                </option>
-                              ))}
-                            </>
-                          )}
-                        </select>
-                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#c9a87c]/70">
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                        </div>
-                      </div>
-                      {errors.service && !isSelectedDateTuesday && (
-                        <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                          {errors.service}
-                        </span>
-                      )}
-                    </div>
-
-                  </div>
-
-                  {/* Row 3: Preferred Date (Full field click opens native calendar) */}
-                  <div
-                    onClick={handleOpenDatePicker}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleOpenDatePicker();
-                      }
-                    }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label="Select appointment date"
-                    className="flex flex-col gap-1.5 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a87c]"
+              {/* Row 1: Name & Mobile Number */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                
+                {/* Full Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="booking-name"
+                    className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
                   >
-                    <div className="flex items-center justify-between">
-                      <label
-                        htmlFor="booking-date"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <CalendarDays className="w-3 h-3 text-[#c9a87c]" />
-                        <span>Preferred Date <span className="text-[#c9a87c]">*</span></span>
-                      </label>
-                      {isSelectedDateTuesday && (
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#df9b8a] font-semibold">
-                          TUESDAY · CLOSED
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative w-full cursor-pointer">
-                      <input
-                        ref={dateInputRef}
-                        id="booking-date"
-                        type="date"
-                        min={todayKolkataString}
-                        value={formData.date}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenDatePicker();
-                        }}
-                        onChange={(e) => handleDateChange(e.target.value)}
-                        style={{ colorScheme: "dark" }}
-                        className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-all min-h-[46px] focus:outline-none cursor-pointer ${
-                          errors.date
-                            ? "border-[#df9b8a] focus:border-[#df9b8a]"
-                            : isSelectedDateTuesday
-                            ? "border-[#c9a87c] ring-1 ring-[#c9a87c]/50 shadow-[0_0_14px_rgba(201,168,124,0.2)]"
-                            : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
-                        }`}
-                      />
-                    </div>
-                    {isSelectedDateTuesday ? (
-                      <p className="text-[10.5px] text-[#eae6df]/65 font-sans mt-0.5">
-                        Choose any date except Tuesday.
-                      </p>
-                    ) : errors.date ? (
-                      <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                        {errors.date}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {/* Refined Tuesday Closed Notice */}
-                  {isSelectedDateTuesday && (
-                    <div className="bg-[#181412] border border-[#c9a87c]/35 p-3.5 sm:p-4 rounded-none flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#c9a87c]/15 border border-[#c9a87c]/30 flex items-center justify-center text-[#c9a87c] shrink-0 mt-0.5">
-                          <CalendarDays className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-[#c9a87c] font-bold block mb-0.5">
-                            CLOSED ON TUESDAYS
-                          </span>
-                          <p className="text-xs text-[#eae6df]/90 font-sans leading-relaxed">
-                            Salon is closed every Tuesday. Please select another date.
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleOpenDatePicker}
-                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-[10.5px] font-mono uppercase tracking-[0.16em] font-semibold text-[#0c0b0a] bg-[#c9a87c] hover:bg-[#eae6df] transition-all duration-200 shrink-0 cursor-pointer self-start sm:self-center shadow-sm"
-                      >
-                        <span>CHANGE DATE</span>
-                      </button>
-                    </div>
+                    <User className="w-3 h-3 text-[#c9a87c]" />
+                    <span>Full Name <span className="text-[#c9a87c]">*</span></span>
+                  </label>
+                  <input
+                    id="booking-name"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    placeholder="Your full name"
+                    autoComplete="name"
+                    className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none ${
+                      errors.name
+                        ? "border-[#df9b8a] focus:border-[#df9b8a]"
+                        : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
+                    }`}
+                  />
+                  {errors.name && (
+                    <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                      {errors.name}
+                    </span>
                   )}
+                </div>
 
-                  {/* Row 4: Selectable Time Slots Grid (Dynamic Asia/Kolkata filtering with 15-min buffer & 3-capacity tracking) */}
-                  {(() => {
-                    const isSelectedDateToday = formData.date === todayKolkataString;
-                    const visibleSlots = BOOKING_SLOTS.filter((slot) => {
-                      if (!formData.date) return true;
-                      return isSlotAvailableTimeWise(formData.date, slot, 15);
-                    });
-                    const allVisibleSlotsFull =
-                      slotsState.length > 0 &&
-                      visibleSlots.length > 0 &&
-                      visibleSlots.every((slot) => {
-                        const s = slotsState.find((x) => x.slot === slot);
-                        return s && !s.available;
-                      });
-                    const hasNoSlotsRemainingToday =
-                      isSelectedDateToday && (visibleSlots.length === 0 || allVisibleSlotsFull);
-
-                    return (
-                      <div className={`flex flex-col gap-2 pt-1 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-35 pointer-events-none select-none" : ""}`}>
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5">
-                            <Clock className="w-3 h-3 text-[#c9a87c]" />
-                            <span>Select Time Slot <span className="text-[#c9a87c]">*</span></span>
-                          </label>
-                          <div className="flex items-center gap-2">
-                            {isLoadingSlots && (
-                              <span className="text-[9px] font-mono text-[#c9a87c] flex items-center gap-1">
-                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                <span>Checking slots...</span>
-                              </span>
-                            )}
-                            <span className="text-[9px] font-mono text-[#c9a87c] uppercase">
-                              9:30 AM – 10:00 PM
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Capacity Helper Legend */}
-                        <div className="flex items-center justify-between text-[9.5px] font-mono text-[#eae6df]/60 pb-0.5">
-                          <span>Up to 3 appointments can be booked per time slot.</span>
-                        </div>
-
-                        {hasNoSlotsRemainingToday ? (
-                          <div className="p-4 bg-white/[0.03] border border-[#c9a87c]/35 text-center space-y-1 my-1">
-                            <p className="text-xs font-mono text-[#c9a87c] font-semibold">
-                              No slots available today. Please select another date.
-                            </p>
-                            <p className="text-[11px] text-[#eae6df]/70 font-sans">
-                              {visibleSlots.length === 0
-                                ? "All booking slots for today have already passed our 15-minute preparation buffer."
-                                : "All remaining slots for today are fully booked. Please select another date."}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                            {visibleSlots.map((slot) => {
-                              const serverSlotInfo = slotsState.find((s) => s.slot === slot);
-                              const spotsLeft = serverSlotInfo
-                                ? typeof serverSlotInfo.spotsLeft === "number"
-                                  ? serverSlotInfo.spotsLeft
-                                  : serverSlotInfo.available
-                                  ? 3
-                                  : 0
-                                : 3;
-                              const isUnavailable = serverSlotInfo ? !serverSlotInfo.available : false;
-                              const isSelected = formData.timeSlot === slot;
-
-                              return (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  disabled={isSelectedDateTuesday || isUnavailable}
-                                  onClick={() => handleChange("timeSlot", slot)}
-                                  className={`relative px-2 py-2 text-center flex flex-col items-center justify-center min-h-[46px] border transition-all duration-200 ${
-                                    isSelectedDateTuesday
-                                      ? "bg-white/[0.02] border-white/10 text-white/40 cursor-not-allowed"
-                                      : isUnavailable
-                                      ? "bg-white/[0.02] border-white/5 text-white/30 cursor-not-allowed line-through opacity-60"
-                                      : isSelected
-                                      ? "bg-[#c9a87c] border-[#c9a87c] text-[#0c0b0a] font-bold shadow-[0_2px_10px_rgba(201,168,124,0.3)]"
-                                      : "bg-[#0c0b0a]/70 border-white/15 text-[#eae6df] hover:border-[#c9a87c]/70 hover:text-white cursor-pointer"
-                                  }`}
-                                >
-                                  <span className={`text-xs font-mono tracking-tight sm:tracking-normal ${isSelected ? "font-bold text-[#0c0b0a]" : ""}`}>
-                                    {slot}
-                                  </span>
-                                  <span
-                                    className={`text-[8.5px] font-mono tracking-wider uppercase mt-0.5 leading-none not-line-through ${
-                                      isSelected
-                                        ? "text-[#0c0b0a]/90 font-semibold"
-                                        : isUnavailable
-                                        ? "text-[#df9b8a]/80 font-medium"
-                                        : spotsLeft === 1
-                                        ? "text-[#c9a87c] font-medium"
-                                        : "text-[#eae6df]/55"
-                                    }`}
-                                  >
-                                    {isUnavailable ? "Fully booked" : `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} left`}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {errors.timeSlot && !isSelectedDateTuesday && !hasNoSlotsRemainingToday && (
-                          <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
-                            {errors.timeSlot}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Row 4: Optional Notes (Preserved & Visually Locked if Tuesday) */}
-                  <div className={`flex flex-col gap-1.5 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-40 pointer-events-none select-none" : ""}`}>
-                    <div className="flex items-center justify-between">
-                      <label
-                        htmlFor="booking-notes"
-                        className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85"
-                      >
-                        Notes / Style Preference
-                      </label>
-                      <span className="text-[9px] font-mono text-[#eae6df]/50 uppercase">
-                        Optional
-                      </span>
+                {/* Mobile Number */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="booking-phone"
+                    className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5"
+                  >
+                    <Phone className="w-3 h-3 text-[#c9a87c]" />
+                    <span>Mobile Number <span className="text-[#c9a87c]">*</span></span>
+                  </label>
+                  <div
+                    className={`flex items-center w-full bg-[#0c0b0a]/90 border transition-colors min-h-[46px] focus-within:ring-1 ${
+                      errors.phone
+                        ? "border-[#df9b8a] focus-within:border-[#df9b8a] focus-within:ring-[#df9b8a]/30"
+                        : "border-white/15 focus-within:border-[#c9a87c]/80 focus-within:ring-[#c9a87c]/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 px-3 bg-white/[0.04] border-r border-white/10 text-xs font-mono text-[#c9a87c] select-none h-full py-2.5 shrink-0">
+                      <span>+91</span>
                     </div>
-                    <textarea
-                      id="booking-notes"
-                      rows={2}
-                      disabled={isSelectedDateTuesday}
-                      value={formData.notes}
-                      onChange={(e) => handleChange("notes", e.target.value)}
-                      placeholder="Specific haircut style, beard length, hair texture details..."
-                      className="w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-sans p-3 border border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30 transition-colors focus:outline-none resize-none min-h-[64px] disabled:cursor-not-allowed"
+                    <input
+                      id="booking-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      maxLength={10}
+                      value={formData.phone}
+                      onChange={handlePhoneInputChange}
+                      placeholder="10-digit mobile"
+                      className="w-full bg-transparent text-[#f5f2eb] placeholder:text-[#eae6df]/40 text-base sm:text-sm font-mono px-3 py-2.5 focus:outline-none"
                     />
                   </div>
-
-                  {/* Step 1 Action Button */}
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={isSelectedDateTuesday}
-                      className="group relative inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-xs font-bold uppercase tracking-[0.18em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_20px_rgba(245,242,235,0.12)] hover:shadow-[0_4px_25px_rgba(201,168,124,0.3)] min-h-[48px] w-full text-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
-                      style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
-                    >
-                      <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
-                      <span className="relative z-10 flex items-center justify-center gap-2 font-bold text-[#0c0b0a]">
-                        <span>CONTINUE TO REVIEW</span>
-                        <ArrowUpRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                      </span>
-                    </button>
-                  </div>
-
-                </form>
-              )}
-
-              {/* ============================================================ */}
-              {/* STEP 2: Review Booking & Pay ₹99 Advance                      */}
-              {/* ============================================================ */}
-              {step === 2 && (
-                <div className="space-y-5">
-                  <div className="border-b border-white/10 pb-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#c9a87c] font-semibold block">
-                      STEP 02 / 02
+                  {errors.phone && (
+                    <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                      {errors.phone}
                     </span>
-                    <h3 className="font-serif text-2xl text-[#f5f2eb] font-light mt-0.5">
-                      Review &amp; Pay ₹{BOOKING_ADVANCE} Advance
-                    </h3>
-                  </div>
-
-                  {/* Payment Failure Notice */}
-                  {paymentStatus === PAYMENT_STATUS.FAILED && (
-                    <div className="bg-[#241310] border border-[#df9b8a]/50 p-4 space-y-2 text-left shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
-                      <div className="flex items-center gap-2.5 text-[#df9b8a]">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span className="font-mono text-xs uppercase tracking-widest font-bold">
-                          {paymentErrorTitle}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#eae6df]/90 font-sans leading-relaxed">
-                        {paymentErrorMessage || "Your appointment has not been confirmed. The ₹99 advance was not completed."}
-                      </p>
-                    </div>
                   )}
+                </div>
 
-                  {/* Summary Details Card */}
-                  <div className="bg-[#0c0b0a] border border-white/12 p-4 sm:p-5 space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-xs border-b border-white/10 pb-3">
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Client Name
-                        </span>
-                        <span className="font-medium text-[#f5f2eb] text-sm">
-                          {formData.name}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Phone Number
-                        </span>
-                        <span className="font-medium text-[#f5f2eb] text-sm">
-                          {formData.phone}
-                        </span>
-                      </div>
+              </div>
+
+              {/* Row 2: Service Category & Specific Service */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                
+                {/* 1. Service Category */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="booking-category"
+                    className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center justify-between"
+                  >
+                    <span>SERVICE CATEGORY <span className="text-[#c9a87c]">*</span></span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="booking-category"
+                      value={formData.category}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer ${
+                        errors.category
+                          ? "border-[#df9b8a] focus:border-[#df9b8a]"
+                          : "border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
+                      }`}
+                    >
+                      <option value="" className="bg-[#141312] text-[#eae6df]/50">
+                        Choose Category...
+                      </option>
+                      {BOOKING_CATALOGUE.map((cat) => (
+                        <option key={cat.id} value={cat.category} className="bg-[#141312] text-[#f5f2eb]">
+                          {cat.category}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#c9a87c]/70">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
                     </div>
+                  </div>
+                  {errors.category && (
+                    <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                      {errors.category}
+                    </span>
+                  )}
+                </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-xs border-b border-white/10 pb-3">
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Service
-                        </span>
-                        <span className="font-medium text-[#c9a87c] text-sm block">
-                          {formData.service || formData.category}
-                        </span>
-                        {formData.service && formData.category && formData.service !== formData.category && (
-                          <span className="text-[11px] text-[#eae6df]/60 block font-normal font-sans">
-                            {formData.category}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Date &amp; Slot
-                        </span>
-                        <span className="font-medium text-[#f5f2eb] text-sm">
-                          {formatDisplayDate(formData.date)}, {formData.timeSlot}
-                        </span>
-                      </div>
+                {/* 2. Specific Service */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="booking-service"
+                    className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center justify-between"
+                  >
+                    <span>SPECIFIC SERVICE</span>
+                    <span className="text-[9px] text-[#c9a87c]/70 uppercase tracking-widest">OPTIONAL</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="booking-service"
+                      disabled={!formData.category}
+                      value={formData.service}
+                      onChange={(e) => handleChange("service", e.target.value)}
+                      className="w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-sans px-3.5 py-2.5 border border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30 transition-colors min-h-[46px] appearance-none focus:outline-none pr-9 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <option value="" className="bg-[#141312] text-[#eae6df]/50">
+                        {formData.category ? "Select specific service..." : "Choose category first"}
+                      </option>
+                      {formData.category &&
+                        getServicesForCategory(formData.category).map((s) => (
+                          <option key={s.name} value={s.name} className="bg-[#141312] text-[#f5f2eb]">
+                            {s.name}
+                          </option>
+                        ))}
+                    </select>
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#c9a87c]/70">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
                     </div>
+                  </div>
+                </div>
 
-                    {formData.notes && (
-                      <div className="text-xs border-b border-white/10 pb-3">
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block mb-0.5">
-                          Special Requests:
-                        </span>
-                        <p className="text-[#eae6df]/85 font-sans italic">
-                          &ldquo;{formData.notes}&rdquo;
-                        </p>
-                      </div>
-                    )}
+              </div>
 
-                    {/* ₹99 Advance Clear Breakdown */}
-                    <div className="pt-1 flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-mono text-xs uppercase tracking-wider text-[#eae6df]">
-                          APPOINTMENT ADVANCE
-                        </span>
-                        <span className="font-serif text-xl text-[#c9a87c] font-semibold">
-                          ₹{BOOKING_ADVANCE}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#eae6df]/75 font-sans leading-relaxed">
-                        ₹{BOOKING_ADVANCE} will be adjusted against your final salon bill. No additional booking fee.
+              {/* Row 3: Appointment Date Selection */}
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="booking-date"
+                  onClick={handleOpenDatePicker}
+                  className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center justify-between cursor-pointer select-none"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays className="w-3 h-3 text-[#c9a87c]" />
+                    <span>PREFERRED DATE <span className="text-[#c9a87c]">*</span></span>
+                  </span>
+                  <span className="text-[9px] text-[#c9a87c] tracking-widest uppercase">
+                    CLOSED TUESDAYS
+                  </span>
+                </label>
+
+                <div
+                  onClick={handleOpenDatePicker}
+                  className="relative cursor-pointer group"
+                >
+                  <input
+                    ref={dateInputRef}
+                    id="booking-date"
+                    type="date"
+                    min={todayKolkataString}
+                    value={formData.date}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    onClick={(e) => {
+                      if (typeof e.currentTarget.showPicker === "function") {
+                        try {
+                          e.currentTarget.showPicker();
+                        } catch {
+                          // fallback
+                        }
+                      }
+                    }}
+                    className={`w-full bg-[#0c0b0a]/90 text-[#f5f2eb] text-base sm:text-sm font-mono px-3.5 py-2.5 border transition-colors min-h-[46px] focus:outline-none cursor-pointer scheme-dark ${
+                      errors.date || isSelectedDateTuesday
+                        ? "border-[#df9b8a] focus:border-[#df9b8a]"
+                        : "border-white/15 group-hover:border-[#c9a87c]/60 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenDatePicker();
+                    }}
+                    aria-label="Open date calendar picker"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c9a87c] group-hover:text-[#f5f2eb] hover:text-[#f5f2eb] transition-colors p-1 cursor-pointer"
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Tuesday Closure Warning Alert */}
+                {isSelectedDateTuesday && (
+                  <div className="p-3 bg-[#2d110f] border border-[#df9b8a]/50 text-[#df9b8a] text-xs font-mono flex items-start gap-2 animate-fadeIn">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold uppercase tracking-wider">Salon Closed on Tuesdays</p>
+                      <p className="text-[11px] text-[#df9b8a]/90 mt-0.5">
+                        Glamour Emporium is closed every Tuesday. Please select another day.
                       </p>
                     </div>
-
                   </div>
+                )}
 
-                  {/* Payment Actions */}
-                  <div className="space-y-3 pt-1">
-                    <button
-                      type="button"
-                      disabled={paymentStatus === PAYMENT_STATUS.PROCESSING || isSubmitting}
-                      onClick={handlePayAdvance}
-                      className="group relative inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-xs font-bold uppercase tracking-[0.16em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] hover:shadow-[0_4px_30px_rgba(201,168,124,0.35)] min-h-[50px] w-full text-center cursor-pointer disabled:opacity-75"
-                      style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
-                    >
-                      <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
-                      <span className="relative z-10 flex items-center justify-center gap-2 font-bold text-[#0c0b0a]">
-                        {paymentStatus === PAYMENT_STATUS.PROCESSING || isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-[#0c0b0a]" />
-                            <span>INITIALIZING SECURE CHECKOUT...</span>
-                          </>
-                        ) : paymentStatus === PAYMENT_STATUS.FAILED ? (
-                          <>
-                            <RotateCcw className="w-4 h-4 text-[#0c0b0a]" />
-                            <span>TRY PAYMENT AGAIN (₹{BOOKING_ADVANCE})</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="w-4 h-4 text-[#0c0b0a]" />
-                            <span>PAY ₹{BOOKING_ADVANCE} &amp; RESERVE SLOT</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                          </>
-                        )}
-                      </span>
-                    </button>
+                {errors.date && !isSelectedDateTuesday && (
+                  <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                    {errors.date}
+                  </span>
+                )}
+              </div>
 
-                    {paymentStatus !== PAYMENT_STATUS.PROCESSING && !isSubmitting && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStep(1);
-                          setPaymentStatus(PAYMENT_STATUS.IDLE);
-                          setPaymentErrorMessage("");
-                        }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-mono uppercase tracking-[0.16em] text-[#eae6df]/75 hover:text-white border border-white/10 hover:border-white/30 transition-colors w-full cursor-pointer"
-                      >
-                        <ArrowLeft className="w-3 h-3" />
-                        <span>{paymentStatus === PAYMENT_STATUS.FAILED ? "Choose Another Slot / Date" : "Edit Details"}</span>
-                      </button>
-                    )}
-
-                    <div className="flex items-center justify-center gap-2 text-[10.5px] text-[#eae6df]/60 font-mono tracking-tight pt-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#c9a87c]" />
-                      <span>Encrypted &amp; Secure Razorpay Payment Gateway Checkout</span>
-                    </div>
-                  </div>
-
+              {/* Row 4: Time Slot Selection (Capacity Aware - 3 spots per slot) */}
+              <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isSelectedDateTuesday ? "opacity-30 pointer-events-none select-none" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-[#c9a87c]" />
+                    <span>TIME SLOT <span className="text-[#c9a87c]">*</span></span>
+                  </label>
+                  <span className="text-[9.5px] font-mono text-[#c9a87c]/80">
+                    {formData.timeSlot ? formData.timeSlot : "Choose time"}
+                  </span>
                 </div>
-              )}
 
-              {/* ============================================================ */}
-              {/* STEP 3: Confirmed / Success State                            */}
-              {/* ============================================================ */}
-              {step === 3 && (
-                <div className="space-y-6 text-center py-2">
-                  
-                  {/* Verified Icon & Header */}
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-14 h-14 rounded-full bg-[#c9a87c]/15 border border-[#c9a87c]/40 flex items-center justify-center text-[#c9a87c] shadow-[0_4px_20px_rgba(201,168,124,0.2)]">
-                      <CheckCircle2 className="w-7 h-7" />
-                    </div>
+                {/* Slot Helper Line & Live Status Indicator */}
+                <div className="flex items-center justify-between text-[10px] font-mono text-[#eae6df]/70 px-0.5">
+                  <span>Up to 3 appointments are available per time slot.</span>
+                  {isLoadingSlots && (
+                    <span className="flex items-center gap-1 text-[#c9a87c] animate-pulse">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      <span className="text-[9px]">Checking slots...</span>
+                    </span>
+                  )}
+                </div>
 
-                    <div>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#c9a87c] font-semibold block mb-1">
-                        APPOINTMENT CONFIRMED ✓
-                      </span>
-                      <h3 className="font-serif text-2xl sm:text-3xl text-[#f5f2eb] font-light">
-                        Your Slot is Reserved
-                      </h3>
-                    </div>
+                {/* Time Slot Grid */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-52 overflow-y-auto p-1.5 bg-[#0c0b0a]/70 border border-white/10 rounded-[1px]">
+                  {BOOKING_SLOTS.map((slot) => {
+                    const slotInfo = slotsState.find((s) => s.slot === slot);
+                    const isPastTime =
+                      formData.date && !isSlotAvailableTimeWise(formData.date, slot, 15);
+                    const remainingSeats =
+                      slotInfo && typeof slotInfo.remainingSeats === "number"
+                        ? slotInfo.remainingSeats
+                        : slotInfo && typeof slotInfo.spotsLeft === "number"
+                        ? slotInfo.spotsLeft
+                        : 3;
+                    const isFullyBooked =
+                      Boolean(
+                        slotInfo &&
+                          (slotInfo.status === "FULLY_BOOKED" ||
+                            slotInfo.available === false ||
+                            remainingSeats <= 0)
+                      );
+                    const isUnavailable = isSelectedDateTuesday || isPastTime || isFullyBooked;
+                    const isSelected = formData.timeSlot === slot;
 
-                    <p className="text-sm text-[#eae6df]/85 font-sans max-w-md mx-auto leading-relaxed">
-                      Please arrive <strong className="text-[#f5f2eb] font-semibold">5–10 minutes before</strong> your scheduled appointment so we can start your service on time.
-                    </p>
-                  </div>
-
-                  {/* Confirmed Details Badge */}
-                  <div className="bg-[#0c0b0a] border border-white/12 p-4 sm:p-5 text-left space-y-2.5">
-                    <div className="grid grid-cols-2 gap-2 text-xs border-b border-white/10 pb-2.5">
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Service
-                        </span>
-                        <span className="font-medium text-[#c9a87c] block">
-                          {formData.service || formData.category}
-                        </span>
-                        {formData.service && formData.category && formData.service !== formData.category && (
-                          <span className="text-[10px] text-[#eae6df]/60 block font-sans">
-                            {formData.category}
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={isUnavailable}
+                        tabIndex={isUnavailable ? -1 : 0}
+                        aria-disabled={isUnavailable}
+                        aria-label={`${slot}, ${isFullyBooked ? "Fully booked" : isPastTime ? "Past slot" : `${remainingSeats} slots left`}`}
+                        onClick={() => handleChange("timeSlot", slot)}
+                        className={`relative px-1.5 py-1.5 text-xs font-mono uppercase tracking-wider border text-center transition-all min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-[1px] ${
+                          isSelected
+                            ? "bg-[#c9a87c] text-[#0c0b0a] border-[#c9a87c] font-bold shadow-sm cursor-pointer ring-1 ring-[#c9a87c]"
+                            : isUnavailable
+                            ? isFullyBooked
+                              ? "bg-[#1f1010]/70 text-white/30 border-red-950/40 cursor-not-allowed select-none"
+                              : "bg-white/[0.02] text-white/20 border-white/5 line-through cursor-not-allowed select-none"
+                            : "bg-white/[0.03] text-[#eae6df] border-white/10 hover:border-[#c9a87c]/70 hover:text-[#f5f2eb] cursor-pointer"
+                        }`}
+                      >
+                        <span className="leading-tight text-[11px] sm:text-xs font-semibold">{slot}</span>
+                        
+                        {/* Availability Sub-label */}
+                        {isSelectedDateTuesday ? null : isPastTime ? (
+                          <span className="text-[7.5px] font-mono text-white/25 uppercase leading-none">PAST</span>
+                        ) : isFullyBooked ? (
+                          <span className="text-[8px] font-mono font-bold text-[#df9b8a] bg-[#2d110f] px-1 py-0.2 rounded-[1px] leading-none uppercase tracking-wider">
+                            FULL
+                          </span>
+                        ) : remainingSeats === 1 ? (
+                          <span
+                            className={`text-[8px] font-sans font-semibold px-1 py-0.2 rounded leading-none transition-colors ${
+                              isSelected
+                                ? "text-[#0c0b0a] font-bold bg-white/30"
+                                : "text-[#fca5a5] bg-[#450a0a]/80 border border-[#ef4444]/40 animate-pulse"
+                            }`}
+                          >
+                            1 slot left
+                          </span>
+                        ) : remainingSeats === 2 ? (
+                          <span
+                            className={`text-[8px] font-sans font-medium leading-none ${
+                              isSelected ? "text-[#0c0b0a]/85 font-semibold" : "text-[#c9a87c]/90"
+                            }`}
+                          >
+                            2 slots left
+                          </span>
+                        ) : (
+                          <span
+                            className={`text-[8px] font-sans leading-none ${
+                              isSelected ? "text-[#0c0b0a]/75" : "text-white/45"
+                            }`}
+                          >
+                            3 slots left
                           </span>
                         )}
-                      </div>
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Client
-                        </span>
-                        <span className="font-medium text-[#f5f2eb]">
-                          {formData.name}
-                        </span>
-                      </div>
-                    </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs border-b border-white/10 pb-2.5">
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Date
-                        </span>
-                        <span className="font-medium text-[#f5f2eb]">
-                          {formatDisplayDate(formData.date)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Time Slot
-                        </span>
-                        <span className="font-medium text-[#f5f2eb]">
-                          {formData.timeSlot}
-                        </span>
-                      </div>
-                    </div>
+                {errors.timeSlot && !isSelectedDateTuesday && (
+                  <span className="text-[11px] text-[#df9b8a] font-mono tracking-wide">
+                    {errors.timeSlot}
+                  </span>
+                )}
+              </div>
 
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <div>
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Booking Advance Paid
-                        </span>
-                        <span className="font-mono text-xs font-semibold text-[#c9a87c]">
-                          ₹{BOOKING_ADVANCE} (Adjustable against bill)
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-[#eae6df]/60 block">
-                          Booking Code
-                        </span>
-                        <span className="font-mono text-xs font-bold text-[#c9a87c]">
-                          {transactionRef}
-                        </span>
-                      </div>
-                    </div>
+              {/* Row 5: Special Notes */}
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="booking-notes"
+                  className="text-[10px] font-mono tracking-[0.18em] uppercase text-[#eae6df]/85 flex items-center justify-between"
+                >
+                  <span>SPECIAL REQUESTS OR PREFERENCES</span>
+                  <span className="text-[9px] text-white/40 uppercase">OPTIONAL</span>
+                </label>
+                <textarea
+                  id="booking-notes"
+                  rows={2}
+                  value={formData.notes}
+                  onChange={(e) => handleChange("notes", e.target.value)}
+                  placeholder="e.g. Specific hair length, sensitive scalp, event styling..."
+                  className="w-full bg-[#0c0b0a]/90 text-[#f5f2eb] placeholder:text-[#eae6df]/30 text-xs font-sans px-3.5 py-2 border border-white/15 focus:border-[#c9a87c]/80 focus:ring-1 focus:ring-[#c9a87c]/30 focus:outline-none transition-colors resize-none"
+                />
+              </div>
+
+              {/* Submit Button (Step 1 -> Step 2 Review) */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSelectedDateTuesday}
+                  className="w-full py-3.5 px-6 bg-[#f5f2eb] hover:bg-[#c9a87c] text-[#0c0b0a] font-bold text-xs font-mono uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(245,242,235,0.12)] disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px]"
+                >
+                  <span>CONTINUE TO CONFIRMATION</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ============================================================ */}
+          {/* STEP 2: Review Appointment & Pay ₹99 Advance                 */}
+          {/* ============================================================ */}
+          {step === 2 && (
+            <div className="space-y-4 sm:space-y-5 animate-fadeIn">
+              
+              {/* Summary Card */}
+              <div className="bg-[#0c0b0a] border border-[#c9a87c]/30 p-4 sm:p-5 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <span className="text-[10px] font-mono uppercase text-[#c9a87c] tracking-[0.2em]">
+                    APPOINTMENT SUMMARY
+                  </span>
+                  <span className="text-[10px] font-mono text-white/50">
+                    ₹{BOOKING_ADVANCE} ADVANCE
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                  <div>
+                    <span className="text-white/40 block text-[9px] uppercase tracking-wider">Customer</span>
+                    <span className="text-[#f5f2eb] font-sans font-medium text-sm">{formData.name}</span>
                   </div>
-
-                  {/* Actions */}
-                  <div className="space-y-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={handleFinish}
-                      className="group relative inline-flex items-center justify-center gap-2 px-6 py-3.5 text-xs font-bold uppercase tracking-[0.18em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] shadow-[0_4px_25px_rgba(245,242,235,0.15)] min-h-[48px] w-full text-center cursor-pointer"
-                      style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
-                    >
-                      <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
-                      <span className="relative z-10 flex items-center justify-center gap-2 font-bold text-[#0c0b0a]">
-                        <span>DONE</span>
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenWhatsAppConfirmation}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-mono uppercase tracking-[0.14em] text-[#c9a87c] hover:text-[#f5f2eb] border border-[#c9a87c]/40 hover:border-[#f5f2eb] transition-colors w-full cursor-pointer"
-                    >
-                      <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
-                      <span>OPEN WHATSAPP CONFIRMATION</span>
-                      <ArrowUpRight className="w-3 h-3" />
-                    </button>
+                  <div>
+                    <span className="text-white/40 block text-[9px] uppercase tracking-wider">Mobile</span>
+                    <span className="text-[#f5f2eb] font-mono">+91 {formData.phone}</span>
                   </div>
+                  <div>
+                    <span className="text-white/40 block text-[9px] uppercase tracking-wider">Service</span>
+                    <span className="text-[#c9a87c] font-sans font-medium">
+                      {formData.service || formData.category}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-white/40 block text-[9px] uppercase tracking-wider">Date &amp; Time</span>
+                    <span className="text-[#f5f2eb]">
+                      {formatDisplayDate(formData.date)}, {formData.timeSlot}
+                    </span>
+                  </div>
+                </div>
 
+                {formData.notes && (
+                  <div className="pt-2 border-t border-white/10 text-[11px] text-white/70">
+                    <span className="text-white/40 block text-[9px] font-mono uppercase tracking-wider">Notes</span>
+                    <p className="mt-0.5 italic">&ldquo;{formData.notes}&rdquo;</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Breakdown */}
+              <div className="bg-white/[0.02] border border-white/10 p-4 space-y-2 text-xs font-mono">
+                <div className="flex justify-between items-center text-[#eae6df]/80">
+                  <span>Appointment Reservation Fee</span>
+                  <span>₹{BOOKING_ADVANCE}.00</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-[#c9a87c] pt-1 border-t border-white/10">
+                  <span className="font-semibold uppercase tracking-wider">Total Due Now</span>
+                  <span className="text-sm font-bold">₹{BOOKING_ADVANCE}.00</span>
+                </div>
+                <p className="text-[10.5px] text-white/50 pt-1 leading-relaxed">
+                  ✦ 100% of this ₹{BOOKING_ADVANCE} advance will be deducted from your final bill at the salon.
+                </p>
+              </div>
+
+              {/* Error Notification during payment */}
+              {paymentStatus === PAYMENT_STATUS.FAILED && paymentErrorMessage && (
+                <div className="p-3.5 bg-[#2d110f] border border-[#df9b8a]/50 text-[#df9b8a] text-xs font-mono space-y-1 animate-fadeIn">
+                  <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{paymentErrorTitle}</span>
+                  </div>
+                  <p className="text-[11px] text-[#df9b8a]/90 leading-relaxed pl-5">
+                    {paymentErrorMessage}
+                  </p>
                 </div>
               )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => setStep(1)}
+                  className="py-3 px-4 border border-white/20 hover:border-white/40 text-[#eae6df] font-mono text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[46px]"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>EDIT DETAILS</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handlePayAdvance}
+                  className="flex-1 py-3 px-4 bg-[#f5f2eb] hover:bg-[#c9a87c] text-[#0c0b0a] font-bold text-xs font-mono uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(245,242,235,0.12)] disabled:opacity-50 min-h-[46px]"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-[#0c0b0a]" />
+                      <span>PROCESSING ADVANCE...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 text-[#0c0b0a]" />
+                      <span>PAY ₹{BOOKING_ADVANCE} &amp; CONFIRM</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
             </div>
+          )}
 
-          </motion.div>
+          {/* ============================================================ */}
+          {/* STEP 3: Confirmed Screen with Receipt Download               */}
+          {/* ============================================================ */}
+          {step === 3 && (
+            <div className="space-y-5 text-center py-2 animate-fadeIn">
+              
+              <div className="w-14 h-14 mx-auto rounded-full bg-[#114b2d] border border-[#2d8f58] flex items-center justify-center text-[#e5fbe8] shadow-[0_0_30px_rgba(45,143,88,0.35)]">
+                <CheckCircle2 className="w-7 h-7 text-[#e5fbe8]" />
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#c9a87c]">
+                  APPOINTMENT RESERVED
+                </span>
+                <h3 className="font-serif text-2xl sm:text-3xl text-[#f5f2eb] font-light">
+                  See You Soon, {formData.name.split(" ")[0]}!
+                </h3>
+                <p className="text-xs text-[#eae6df]/70 font-sans max-w-sm mx-auto">
+                  Your appointment is confirmed and your ₹{BOOKING_ADVANCE} advance has been recorded.
+                </p>
+              </div>
+
+              {/* Reference Box */}
+              <div className="bg-[#0c0b0a] border border-[#c9a87c]/40 p-4 text-left font-mono text-xs space-y-2 max-w-sm mx-auto">
+                <div className="flex justify-between border-b border-white/10 pb-1.5">
+                  <span className="text-white/40 uppercase">Booking ID</span>
+                  <span className="text-[#c9a87c] font-bold text-sm">{transactionRef}</span>
+                </div>
+                <div className="flex justify-between border-b border-white/10 pb-1.5">
+                  <span className="text-white/40 uppercase">Service</span>
+                  <span className="text-[#f5f2eb] font-sans">{formData.service || formData.category}</span>
+                </div>
+                <div className="flex justify-between border-b border-white/10 pb-1.5">
+                  <span className="text-white/40 uppercase">Schedule</span>
+                  <span className="text-[#f5f2eb]">{formatDisplayDate(formData.date)}, {formData.timeSlot}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40 uppercase">Advance Paid</span>
+                  <span className="text-[#114b2d] bg-[#e5fbe8] px-1.5 py-0.5 rounded font-bold">₹{BOOKING_ADVANCE} PAID</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col gap-2.5 max-w-sm mx-auto pt-2">
+                
+                {/* View / Download Official Receipt Button */}
+                <a
+                  href={`/api/bookings/${transactionRef}/receipt?phone=${encodeURIComponent(formData.phone)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 bg-[#c9a87c] hover:bg-[#dfbe93] text-[#0c0b0a] font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>VIEW / PRINT ADVANCE RECEIPT</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                {/* WhatsApp Confirmation Button */}
+                <button
+                  type="button"
+                  onClick={handleOpenWhatsAppConfirmation}
+                  className="w-full py-2.5 px-4 border border-white/20 hover:border-[#c9a87c] text-[#f5f2eb] text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" color="#25D366" />
+                  <span>WHATSAPP CONFIRMATION</span>
+                </button>
+
+                {/* Close Modal Button */}
+                <button
+                  type="button"
+                  onClick={handleFinish}
+                  className="w-full py-2.5 px-4 text-white/50 hover:text-white text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  DONE / CLOSE
+                </button>
+              </div>
+
+            </div>
+          )}
+
         </div>
+      </motion.div>
+    </div>
+  );
+}
+
+export default function BookingModal() {
+  const { isOpen, bookingPayload, closeBooking } = useBooking();
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <BookingModalInner
+          key={isOpen ? `${bookingPayload?.category || ""}-${bookingPayload?.service || ""}` : "closed"}
+          bookingPayload={bookingPayload}
+          closeBooking={closeBooking}
+        />
       )}
     </AnimatePresence>
   );
 }
-

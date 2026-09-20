@@ -1,14 +1,26 @@
 import { formatDisplayDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
+import { sendOwnerBookingNotification } from "@/lib/email";
 
 const SALON_PRIMARY_WHATSAPP = process.env.SALON_PRIMARY_WHATSAPP || "917495068282";
 
 /**
- * Notification handler triggered when an appointment is CONFIRMED.
- * Prepares and structures messages for future WhatsApp Business API integration.
+ * Unified notification handler triggered when an appointment is CONFIRMED.
+ * 1. Dispatches Resend email to salon owner with deduplication.
+ * 2. Prepares WhatsApp Business API payloads for future direct messaging.
  * @param {Object} booking
  */
 export async function notifyConfirmedBooking(booking) {
+  if (!booking) return { success: false, error: "Missing booking object" };
+
   try {
+    // 1. Send owner email via Resend
+    try {
+      await sendOwnerBookingNotification(booking);
+    } catch (emailErr) {
+      console.warn("[Notifications] Owner email dispatch warning:", emailErr.message);
+    }
+
+    // 2. WhatsApp notification payload preparation
     const formattedDate = formatDisplayDate(booking.bookingDate);
     const serviceDisplay = booking.service
       ? (booking.serviceCategory && booking.service !== booking.serviceCategory
@@ -16,7 +28,6 @@ export async function notifyConfirmedBooking(booking) {
           : booking.service)
       : booking.serviceCategory || "Salon Service";
 
-    // 1. Customer Confirmation Message Payload
     const customerMessage =
       `Hello ${booking.customerName.trim()} 👋\n\n` +
       `Your appointment at Glamour Emporium is confirmed.\n\n` +
@@ -29,7 +40,6 @@ export async function notifyConfirmedBooking(booking) {
       `Thank you for choosing Glamour Emporium.\n` +
       `Location: Jattal Road, Near Choudhary Hospital, Panipat, Haryana 132103`;
 
-    // 2. Salon Staff Alert Message Payload
     const staffAlertMessage =
       `NEW PAID APPOINTMENT\n\n` +
       `Customer: ${booking.customerName.trim()}\n` +
@@ -55,12 +65,10 @@ export async function notifyConfirmedBooking(booking) {
       },
     };
 
-    console.log("[NOTIFICATION HOOK] Appointment Confirmed Payload Prepared:", JSON.stringify(notificationPayload, null, 2));
-
-    // When a WhatsApp Provider API is configured in future, dispatch request here.
+    console.log("[Notifications] Confirmed appointment hook completed for:", booking.bookingCode);
     return { success: true, payload: notificationPayload };
   } catch (err) {
-    console.error("[NOTIFICATION HOOK] Error preparing notification payload:", err);
+    console.error("[Notifications] Error in notifyConfirmedBooking:", err.message);
     return { success: false, error: err.message };
   }
 }

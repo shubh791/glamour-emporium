@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import {
   verifyRazorpayPaymentSignature,
   fetchRazorpayPayment,
   getRazorpayConfig,
 } from "@/lib/razorpay";
-import { generateBookingCode, sanitizePhone } from "@/lib/bookingService";
-import { SLOT_CAPACITY } from "@/data/bookingConfig";
+import {
+  sanitizePhone,
+  confirmBookingWithCapacityCheck,
+} from "@/lib/bookingService";
 import { notifyConfirmedBooking } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export async function POST(request) {
       razorpayPaymentId,
       razorpaySignature,
       customerName,
+      customerPhone,
       phone,
       serviceCategory,
       service,
@@ -28,9 +30,12 @@ export async function POST(request) {
       notes,
     } = body || {};
 
+    const rawPhone = customerPhone || phone || "";
+    const cleanedPhone = sanitizePhone(rawPhone);
+
     const { keyId, keySecret, isConfigured } = getRazorpayConfig();
 
-    // Safe terminal diagnostics (never log secrets or sensitive payload values)
+    // Safe diagnostics
     console.log("[Verify Route Diagnostics]", {
       hasKeyId: Boolean(keyId),
       hasSecret: Boolean(keySecret),
@@ -39,6 +44,7 @@ export async function POST(request) {
       receivedOrderId: razorpayOrderId || null,
       receivedPaymentId: razorpayPaymentId || null,
       hasSignature: Boolean(razorpaySignature),
+      phone: cleanedPhone || null,
     });
 
     if (!razorpayOrderId || !razorpayPaymentId) {
@@ -47,6 +53,7 @@ export async function POST(request) {
           success: false,
           isConfirmed: false,
           error: "Payment could not be verified. Missing payment reference.",
+          code: "MISSING_PAYMENT_REF",
         },
         { status: 400 }
       );
@@ -62,7 +69,7 @@ export async function POST(request) {
       });
     }
 
-    // 2. Direct Server API Fallback Check (if signature failed or wasn't provided, double-check directly with Razorpay)
+    // 2. Direct Server API Fallback Check (if signature check wasn't possible or failed)
     let isPaymentVerified = isSignatureValid;
     if (!isPaymentVerified && isConfigured) {
       try {
@@ -94,129 +101,55 @@ export async function POST(request) {
           success: false,
           isConfirmed: false,
           error: "Payment could not be verified. Please try again.",
+          code: "PAYMENT_NOT_VERIFIED",
         },
         { status: 400 }
       );
     }
 
-    // 3. Check for existing booking (Idempotency check)
-    let booking = await prisma.booking.findFirst({
-      where: {
-        OR: [
-          razorpayOrderId ? { razorpayOrderId } : undefined,
-          razorpayPaymentId ? { razorpayPaymentId } : undefined,
-          bookingCode ? { bookingCode } : undefined,
-        ].filter(Boolean),
-      },
+    // 3. Atomically Confirm Booking Under Concurrency & Capacity Protection
+    const confirmationResult = await confirmBookingWithCapacityCheck({
+      bookingCode,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature: razorpaySignature || null,
+      customerName: (customerName || "Salon Customer").trim(),
+      phone: cleanedPhone || "0000000000",
+      serviceCategory: serviceCategory || "Hair & Styling",
+      service: service || null,
+      bookingDate,
+      bookingTime,
+      notes: notes ? String(notes).trim() : null,
     });
 
-    if (booking) {
-      // If already confirmed in DB, return immediately
-      if (booking.bookingStatus === "CONFIRMED" && booking.paymentStatus === "SUCCESS") {
-        console.log(`[Verify Route] Booking ${booking.bookingCode} was already confirmed.`);
-        return NextResponse.json({
-          success: true,
-          isConfirmed: true,
-          booking,
-        });
-      }
-
-      // Check slot capacity before confirming
-      const targetDate = booking.bookingDate || bookingDate;
-      const targetTime = booking.bookingTime || bookingTime;
-      const confirmedCount = await prisma.booking.count({
-        where: {
-          bookingDate: targetDate,
-          bookingTime: targetTime,
-          bookingStatus: "CONFIRMED",
+    if (!confirmationResult.success || !confirmationResult.isConfirmed) {
+      console.warn("[Verify Route] Booking confirmation failed:", confirmationResult);
+      return NextResponse.json(
+        {
+          success: false,
+          isConfirmed: false,
+          error: confirmationResult.error || "This time slot just became full. Please select another time.",
+          code: confirmationResult.code || "SLOT_FULL",
         },
-      });
-
-      if (confirmedCount >= SLOT_CAPACITY) {
-        console.warn(`[Verify Route] Slot ${targetDate} ${targetTime} is full (${confirmedCount}/${SLOT_CAPACITY})!`);
-        return NextResponse.json(
-          {
-            success: false,
-            isConfirmed: false,
-            error: "Sorry, this time slot was just filled. Please choose another slot.",
-          },
-          { status: 409 }
-        );
-      }
-
-      // Update to confirmed
-      booking = await prisma.booking.update({
-        where: { id: booking.id },
-        data: {
-          paymentStatus: "SUCCESS",
-          bookingStatus: "CONFIRMED",
-          razorpayOrderId: razorpayOrderId || booking.razorpayOrderId,
-          razorpayPaymentId: razorpayPaymentId || booking.razorpayPaymentId,
-          razorpaySignature: razorpaySignature || booking.razorpaySignature,
-        },
-      });
-    } else {
-      // Check slot capacity before creating confirmed booking
-      const targetDate = bookingDate || new Date().toISOString().split("T")[0];
-      const targetTime = bookingTime || "10:00 AM";
-      const confirmedCount = await prisma.booking.count({
-        where: {
-          bookingDate: targetDate,
-          bookingTime: targetTime,
-          bookingStatus: "CONFIRMED",
-        },
-      });
-
-      if (confirmedCount >= SLOT_CAPACITY) {
-        console.warn(`[Verify Route] Slot ${targetDate} ${targetTime} is full (${confirmedCount}/${SLOT_CAPACITY})!`);
-        return NextResponse.json(
-          {
-            success: false,
-            isConfirmed: false,
-            error: "Sorry, this time slot was just filled. Please choose another slot.",
-          },
-          { status: 409 }
-        );
-      }
-
-      // 4. Create Confirmed Booking in Database ONLY AFTER verified payment
-      const finalBookingCode = bookingCode || generateBookingCode();
-      const cleanedPhone = sanitizePhone(phone);
-
-      booking = await prisma.booking.create({
-        data: {
-          bookingCode: finalBookingCode,
-          customerName: (customerName || "Salon Customer").trim(),
-          phone: cleanedPhone,
-          serviceCategory: serviceCategory || "Hair & Styling",
-          service: service || null,
-          bookingDate: targetDate,
-          bookingTime: targetTime,
-          notes: notes ? String(notes).trim() : null,
-          amount: 99,
-          currency: "INR",
-          paymentStatus: "SUCCESS",
-          bookingStatus: "CONFIRMED",
-          razorpayOrderId,
-          razorpayPaymentId,
-          razorpaySignature: razorpaySignature || null,
-        },
-      });
+        { status: confirmationResult.code === "SLOT_FULL" ? 409 : 400 }
+      );
     }
 
-    console.log(`[Verify Route] Booking ${booking.bookingCode} successfully CONFIRMED in database.`);
+    console.log(`[Verify Route] Booking ${confirmationResult.booking.bookingCode} confirmed successfully.`);
 
-    // Send transactional confirmations
-    try {
-      await notifyConfirmedBooking(booking);
-    } catch (notifyErr) {
-      console.warn("[Verify Route] Notification warning:", notifyErr.message);
+    // 4. Send Owner & Customer Notifications (Deduplicated)
+    if (!confirmationResult.alreadyConfirmed) {
+      try {
+        await notifyConfirmedBooking(confirmationResult.booking);
+      } catch (notifyErr) {
+        console.warn("[Verify Route] Notification warning:", notifyErr.message);
+      }
     }
 
     return NextResponse.json({
       success: true,
       isConfirmed: true,
-      booking,
+      booking: confirmationResult.booking,
     });
   } catch (err) {
     console.error("[Verify Route] Unexpected error during booking confirmation:", err);
@@ -225,6 +158,7 @@ export async function POST(request) {
         success: false,
         isConfirmed: false,
         error: "Payment could not be verified. Please try again.",
+        code: "SERVER_ERROR",
       },
       { status: 500 }
     );

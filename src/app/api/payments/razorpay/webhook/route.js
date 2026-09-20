@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { notifyConfirmedBooking } from "@/lib/notifications";
+import { sanitizePhone, confirmBookingWithCapacityCheck } from "@/lib/bookingService";
 
 export const dynamic = "force-dynamic";
 
@@ -53,61 +54,41 @@ export async function POST(request) {
 
     if (isSuccess) {
       const notes = orderEntity?.notes || paymentEntity?.notes || {};
-      let booking = await prisma.booking.findFirst({
-        where: {
-          OR: [
-            razorpayOrderId ? { razorpayOrderId } : undefined,
-            razorpayPaymentId ? { razorpayPaymentId } : undefined,
-            notes.bookingCode ? { bookingCode: notes.bookingCode } : undefined,
-          ].filter(Boolean),
-        },
+      
+      const confirmationResult = await confirmBookingWithCapacityCheck({
+        bookingCode: notes.bookingCode,
+        razorpayOrderId,
+        razorpayPaymentId,
+        customerName: notes.customerName || "Salon Customer",
+        phone: notes.customerPhone ? sanitizePhone(notes.customerPhone) : "0000000000",
+        serviceCategory: notes.serviceCategory || "Hair & Styling",
+        service: notes.service || null,
+        bookingDate: notes.bookingDate,
+        bookingTime: notes.bookingTime,
+        notes: notes.notes || null,
       });
 
-      if (booking) {
-        if (booking.bookingStatus === "CONFIRMED" && booking.paymentStatus === "SUCCESS") {
-          console.log(`[Razorpay Webhook] Booking ${booking.bookingCode} already confirmed.`);
-          return NextResponse.json(
-            { received: true, status: "ALREADY_CONFIRMED" },
-            { status: 200 }
-          );
-        }
-
-        booking = await prisma.booking.update({
-          where: { id: booking.id },
-          data: {
-            paymentStatus: "SUCCESS",
-            bookingStatus: "CONFIRMED",
-            razorpayOrderId: razorpayOrderId || booking.razorpayOrderId,
-            razorpayPaymentId: razorpayPaymentId || booking.razorpayPaymentId,
-          },
-        });
-      } else {
-        // Create confirmed booking from order metadata notes
-        booking = await prisma.booking.create({
-          data: {
-            bookingCode: notes.bookingCode || `GE-${Date.now().toString(36).toUpperCase()}`,
-            customerName: notes.customerName || "Salon Customer",
-            phone: notes.customerPhone || "0000000000",
-            serviceCategory: notes.serviceCategory || "Hair & Styling",
-            service: notes.service || null,
-            bookingDate: notes.bookingDate || new Date().toISOString().split("T")[0],
-            bookingTime: notes.bookingTime || "10:00 AM",
-            notes: notes.notes || null,
-            amount: 99,
-            currency: "INR",
-            paymentStatus: "SUCCESS",
-            bookingStatus: "CONFIRMED",
-            razorpayOrderId,
-            razorpayPaymentId,
-          },
-        });
+      if (!confirmationResult.success || !confirmationResult.isConfirmed) {
+        console.warn("[Razorpay Webhook] Booking confirmation note:", confirmationResult);
+        return NextResponse.json(
+          { received: true, status: confirmationResult.code || "REJECTED" },
+          { status: 200 }
+        );
       }
 
-      console.log(`[Razorpay Webhook] Booking ${booking.bookingCode} confirmed via webhook.`);
+      if (confirmationResult.alreadyConfirmed) {
+        console.log(`[Razorpay Webhook] Booking ${confirmationResult.booking.bookingCode} was already confirmed.`);
+        return NextResponse.json(
+          { received: true, status: "ALREADY_CONFIRMED" },
+          { status: 200 }
+        );
+      }
+
+      console.log(`[Razorpay Webhook] Booking ${confirmationResult.booking.bookingCode} confirmed via webhook.`);
 
       // Trigger notification service
       try {
-        await notifyConfirmedBooking(booking);
+        await notifyConfirmedBooking(confirmationResult.booking);
       } catch (notifyErr) {
         console.warn("[Razorpay Webhook] Notification warning:", notifyErr.message);
       }
@@ -115,17 +96,21 @@ export async function POST(request) {
       return NextResponse.json({ received: true, status: "CONFIRMED" }, { status: 200 });
     }
 
-    // 5. Handle Payment Failure Events
+    // 3. Handle Payment Failure Events
     const isFailed = event === "payment.failed" || paymentEntity?.status === "failed";
-    if (isFailed && booking && booking.bookingStatus === "PENDING_PAYMENT") {
-      await prisma.booking.update({
-        where: { id: booking.id },
-        data: {
-          paymentStatus: "FAILED",
-        },
+    if (isFailed && razorpayOrderId) {
+      const booking = await prisma.booking.findFirst({
+        where: { razorpayOrderId },
       });
-
-      console.log(`[Razorpay Webhook] Booking ${booking.bookingCode} marked as FAILED.`);
+      if (booking && booking.bookingStatus === "PENDING_PAYMENT") {
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            paymentStatus: "FAILED",
+          },
+        });
+        console.log(`[Razorpay Webhook] Booking ${booking.bookingCode} marked as FAILED.`);
+      }
       return NextResponse.json({ received: true, status: "FAILED" }, { status: 200 });
     }
 

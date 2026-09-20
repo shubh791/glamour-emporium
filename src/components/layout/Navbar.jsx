@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { ArrowUpRight, Menu, X, CalendarDays } from "lucide-react";
 import { siteData } from "@/data/siteData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -56,115 +57,90 @@ export default function Navbar() {
 
   return (
     <>
-      <motion.header
-        initial={prefersReducedMotion ? false : { y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className={`fixed top-0 left-0 right-0 z-50 w-full bg-[#090909]/98 backdrop-blur-md border-b border-[#c9a87c]/30 transition-all duration-300 ${
+      <header
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ease-out ${
           isScrolled
-            ? "shadow-[0_10px_30px_rgba(0,0,0,0.8)]"
-            : "shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+            ? "bg-[#090909]/95 backdrop-blur-md border-b border-[#c9a87c]/30 shadow-[0_4px_30px_rgba(0,0,0,0.85)] py-2.5 sm:py-3"
+            : "bg-[#090909]/80 backdrop-blur-sm border-b border-[#c9a87c]/15 py-3 sm:py-4 md:py-5"
         }`}
+        style={{ backgroundColor: "#090909" }}
       >
-        <div className={`mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 flex items-center justify-between transition-all duration-300 ${
-          isScrolled ? "py-2 sm:py-3 lg:py-3.5" : "py-3 sm:py-4 lg:py-5"
-        }`}>
-          
-          {/* ============================================================ */}
-          {/* DESKTOP BRAND (Left Column: Official Emblem + Wordmark)      */}
-          {/* ============================================================ */}
-          <div className="hidden lg:flex items-center">
-            <a
-              href="/#hero"
-              className="group flex items-center gap-3.5 focus-visible:outline-none"
-              aria-label={`${siteData.business.name} — Home`}
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            
+            {/* ============================================================ */}
+            {/* BRAND LOGO & IDENTITY (Left Column)                          */}
+            {/* ============================================================ */}
+            <Link
+              href="/"
+              aria-label="Glamour Emporium — Unisex Salon • Panipat"
+              className="flex items-center gap-2.5 sm:gap-3 group shrink min-w-0"
             >
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-[#c9a87c]/60 bg-[#0c0b0a] group-hover:border-[#c9a87c] shrink-0 transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full overflow-hidden border border-[#c9a87c]/60 group-hover:border-[#c9a87c] transition-colors shrink-0 shadow-sm">
                 <Image
                   src="/images/logo/logo-mark.webp"
-                  alt="Glamour Emporium Official Emblem"
+                  alt="Glamour Emporium Logo Emblem"
                   fill
-                  sizes="40px"
-                  className="object-cover"
                   priority
+                  sizes="(max-width: 640px) 32px, (max-width: 768px) 40px, 44px"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
-              <div className="flex flex-col justify-center">
-                <span className="font-serif font-light tracking-[0.18em] uppercase text-[18px] xl:text-[19px] text-[#f5f2eb] group-hover:text-[#c9a87c] transition-colors leading-tight">
+
+              <div className="flex flex-col justify-center min-w-0">
+                <span className="font-serif text-[12.5px] xs:text-[14px] sm:text-[17px] md:text-[19px] font-normal tracking-[0.14em] sm:tracking-[0.18em] text-[#f5f2eb] uppercase leading-tight group-hover:text-[#c9a87c] transition-colors truncate">
                   GLAMOUR EMPORIUM
                 </span>
-                <span className="font-sans font-medium text-[8px] xl:text-[8.5px] tracking-[0.32em] uppercase text-[#c9a87c] mt-0.5 leading-none">
+                <span className="font-sans font-medium text-[6.5px] xs:text-[7.5px] sm:text-[8px] md:text-[8.5px] tracking-[0.22em] sm:tracking-[0.32em] uppercase text-[#c9a87c] mt-0.5 leading-none truncate">
                   UNISEX SALON • PANIPAT
                 </span>
               </div>
-            </a>
-          </div>
-
-          {/* ============================================================ */}
-          {/* MOBILE BRAND (Left: Official Emblem + Full Brand Name)       */}
-          {/* ============================================================ */}
-          <a
-            href="/#hero"
-            className="flex lg:hidden items-center gap-2 xs:gap-2.5 sm:gap-3 group focus-visible:outline-none shrink-0"
-            aria-label={`${siteData.business.name} — Home`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <div className="relative w-8 h-8 xs:w-8.5 xs:h-8.5 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-[#0c0b0a] border border-[#c9a87c]/60 group-hover:border-[#c9a87c] shrink-0 transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-              <Image
-                src="/images/logo/logo-mark.webp"
-                alt="Glamour Emporium Official Emblem"
-                fill
-                sizes="40px"
-                className="object-cover"
-                priority
-              />
-            </div>
-
-            <div className="flex items-center">
-              <span className="font-serif font-light tracking-[0.08em] xs:tracking-[0.11em] sm:tracking-[0.15em] uppercase text-[12.5px] xs:text-[13.5px] sm:text-[16px] text-[#f5f2eb] group-hover:text-[#c9a87c] transition-colors whitespace-nowrap leading-none">
-                GLAMOUR EMPORIUM
-              </span>
-            </div>
-          </a>
-
-          {/* ============================================================ */}
-          {/* DESKTOP NAVIGATION (Center Column: Generous Spacing)         */}
-          {/* ============================================================ */}
-          <nav
-            className="hidden lg:flex items-center gap-7 xl:gap-10"
-            aria-label="Main Navigation"
-          >
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="relative py-1 text-[12.5px] xl:text-[13px] uppercase tracking-[0.24em] font-medium text-[#eae6df] hover:text-[#f5f2eb] transition-colors group"
-              >
-                <span>{link.label}</span>
-                <span className="absolute bottom-0 left-0 h-[1.5px] w-0 bg-[#c9a87c] transition-all duration-300 ease-out group-hover:w-full" />
-              </a>
-            ))}
-          </nav>
-
-          {/* ============================================================ */}
-          {/* DESKTOP ACTION AREA (Right Column: Clean Book CTA Button)    */}
-          {/* ============================================================ */}
-          <div className="hidden lg:flex items-center pl-6 lg:pl-8 xl:pl-10">
-            <button
-              type="button"
-              onClick={() => openBooking()}
-              className="group relative inline-flex items-center justify-center gap-2 px-5 py-2.5 text-[11px] font-bold font-mono uppercase tracking-[0.2em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] cursor-pointer focus-visible:outline-none shadow-[0_2px_15px_rgba(245,242,235,0.1)] shrink-0"
-              style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
-              aria-label="Book an appointment slot at Glamour Emporium"
+            </Link>
+            {/* ============================================================ */}
+            {/* DESKTOP NAVIGATION (Center Column: Generous Spacing)         */}
+            {/* ============================================================ */}
+            <nav
+              className="hidden lg:flex items-center gap-7 xl:gap-10"
+              aria-label="Main Navigation"
             >
-              <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
-              <span className="relative z-10 flex items-center gap-1.5 font-bold text-[#0c0b0a]">
-                <CalendarDays className="w-3.5 h-3.5 text-[#0c0b0a]" />
-                <span>BOOK A SLOT</span>
-                <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </span>
-            </button>
-          </div>
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="relative py-1 text-[12.5px] xl:text-[13px] uppercase tracking-[0.24em] font-medium text-[#eae6df] hover:text-[#f5f2eb] transition-colors group"
+                >
+                  <span>{link.label}</span>
+                  <span className="absolute bottom-0 left-0 h-[1.5px] w-0 bg-[#c9a87c] transition-all duration-300 ease-out group-hover:w-full" />
+                </a>
+              ))}
+            </nav>
+
+            {/* ============================================================ */}
+            {/* DESKTOP ACTION AREA (Right Column: Find Booking + Book CTA)  */}
+            {/* ============================================================ */}
+            <div className="hidden lg:flex items-center gap-4 pl-6 lg:pl-8 xl:pl-10">
+              <a
+                href="/find-booking"
+                className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#eae6df] hover:text-[#c9a87c] transition-colors font-medium"
+              >
+                Find Booking
+              </a>
+
+              <button
+                type="button"
+                onClick={() => openBooking()}
+                className="group relative inline-flex items-center justify-center gap-2 px-5 py-2.5 text-[11px] font-bold font-mono uppercase tracking-[0.2em] text-[#0c0b0a] bg-[#f5f2eb] border border-[#f5f2eb] overflow-hidden transition-all duration-300 hover:border-[#c9a87c] cursor-pointer focus-visible:outline-none shadow-[0_2px_15px_rgba(245,242,235,0.1)] shrink-0"
+                style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
+                aria-label="Book an appointment slot at Glamour Emporium"
+              >
+                <span className="absolute inset-0 bg-[#c9a87c] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out pointer-events-none" />
+                <span className="relative z-10 flex items-center gap-1.5 font-bold text-[#0c0b0a]">
+                  <CalendarDays className="w-3.5 h-3.5 text-[#0c0b0a]" />
+                  <span>BOOK A SLOT</span>
+                  <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </span>
+              </button>
+            </div>
 
           {/* ============================================================ */}
           {/* MOBILE RIGHT CONTROLS: Compact BOOK CTA + Menu Trigger       */}
@@ -193,7 +169,8 @@ export default function Navbar() {
           </div>
 
         </div>
-      </motion.header>
+        </div>
+      </header>
 
       {/* ============================================================ */}
       {/* MOBILE EDITORIAL FULLSCREEN MENU                             */}
@@ -265,6 +242,19 @@ export default function Navbar() {
                   </span>
                   <ArrowUpRight className="w-4 h-4" />
                 </button>
+
+                {/* Find Booking Quick Link */}
+                <a
+                  href="/find-booking"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between w-full p-3 sm:p-3.5 border border-[#c9a87c]/30 bg-white/[0.02] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[44px]"
+                >
+                  <span className="flex items-center gap-2 text-[#c9a87c]">
+                    <span>✦</span>
+                    <span>FIND MY BOOKING / RECEIPT</span>
+                  </span>
+                  <ArrowUpRight className="w-3.5 h-3.5 text-[#c9a87c]" />
+                </a>
 
                 {/* Instagram Quick Link */}
                 <a

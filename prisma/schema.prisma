@@ -24,6 +24,7 @@ enum BookingStatus {
 model Booking {
   id                String        @id @default(cuid())
   bookingCode       String        @unique
+  clerkUserId       String?
   customerName      String
   phone             String
   serviceCategory   String
@@ -39,10 +40,12 @@ model Booking {
   paymentStatus     PaymentStatus @default(PENDING)
   bookingStatus     BookingStatus @default(PENDING_PAYMENT)
   slotHoldExpiresAt DateTime?
+  ownerNotifiedAt   DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   @@index([bookingDate, bookingTime, bookingStatus])
   @@index([razorpayOrderId])
   @@index([bookingCode])
+  @@index([clerkUserId, createdAt])
 }

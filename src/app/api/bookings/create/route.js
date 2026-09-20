@@ -20,6 +20,7 @@ export async function POST(request) {
     const body = await request.json();
     const {
       customerName,
+      customerPhone,
       phone,
       serviceCategory,
       service,
@@ -28,100 +29,106 @@ export async function POST(request) {
       notes,
     } = body || {};
 
-    // 1. Validate required fields
+    // 1. Validate required customer name
     if (!customerName || !customerName.trim()) {
       return NextResponse.json(
-        { error: "Customer name is required" },
+        { error: "Please provide your full name for the booking.", code: "INVALID_NAME" },
         { status: 400 }
       );
     }
 
-    const cleanedPhone = sanitizePhone(phone);
+    // 2. Validate required 10-digit Indian phone number
+    const rawPhone = customerPhone || phone || "";
+    const cleanedPhone = sanitizePhone(rawPhone);
     if (!isValidPhone(cleanedPhone)) {
       return NextResponse.json(
-        { error: "Enter a valid 10-digit mobile number." },
+        {
+          error: "Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).",
+          code: "INVALID_PHONE",
+        },
         { status: 400 }
       );
     }
 
+    // 3. Validate service details
     if (!serviceCategory) {
       return NextResponse.json(
-        { error: "Service category is required" },
+        { error: "Please select a service category.", code: "INVALID_CATEGORY" },
         { status: 400 }
       );
     }
 
     if (!bookingDate) {
       return NextResponse.json(
-        { error: "Booking date is required" },
+        { error: "Please select an appointment date.", code: "INVALID_DATE" },
         { status: 400 }
       );
     }
 
     if (!bookingTime) {
       return NextResponse.json(
-        { error: "Time slot is required" },
+        { error: "Please select an appointment time slot.", code: "INVALID_TIME" },
         { status: 400 }
       );
     }
 
-    // 2. Enforce Tuesday Closure Rule (Server-side defense)
+    // 4. Enforce Tuesday Closure Rule (Server-side defense)
     if (isTuesday(bookingDate)) {
       return NextResponse.json(
-        { error: "Salon is closed every Tuesday. Please select another date." },
+        { error: "The salon is closed every Tuesday. Please select another date.", code: "TUESDAY_CLOSED" },
         { status: 400 }
       );
     }
 
-    // 3. Reject Past Dates
+    // 5. Reject Past Dates
     if (isPastDate(bookingDate)) {
       return NextResponse.json(
-        { error: "Please select today or a future date." },
+        { error: "Please select today or a future date for your appointment.", code: "PAST_DATE" },
         { status: 400 }
       );
     }
 
-    // 4. Validate 15-minute lead buffer if date is today
+    // 6. Validate 15-minute lead buffer if date is today
     if (!isSlotAvailableTimeWise(bookingDate, bookingTime, 15)) {
       return NextResponse.json(
         {
-          error: "This time slot is no longer available today. Please select another slot.",
+          error: "This time slot is no longer available today. Please choose another time slot.",
           code: "SLOT_UNAVAILABLE",
         },
         { status: 409 }
       );
     }
 
-    // 5. Check Slot Availability in Database (Capacity < 3)
+    // 7. Check Slot Availability in Database (Capacity < 3)
     const available = await isSlotAvailable(bookingDate, bookingTime);
     if (!available) {
       return NextResponse.json(
         {
-          error: "This time slot is already fully booked. Please choose another slot.",
-          code: "SLOT_UNAVAILABLE",
+          error: "This time slot just became full. Please select another time.",
+          code: "SLOT_FULL",
         },
         { status: 409 }
       );
     }
 
-    // 6. Check Razorpay Configuration
+    // 8. Check Razorpay Configuration
     const razorpayConfig = getRazorpayConfig();
     if (!razorpayConfig.isConfigured) {
       return NextResponse.json(
         {
           error:
-            "Razorpay test keys are not configured. Please add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env.local file to test checkout.",
+            "Razorpay keys are not configured. Please add NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env.local file.",
           code: "RAZORPAY_KEYS_NOT_CONFIGURED",
         },
         { status: 400 }
       );
     }
 
-    // 7. Generate Unique Booking Code for Receipt
+    // 9. Generate Unique Booking Code for Tracking & Receipt
     const bookingCode = generateBookingCode();
     const amount = BOOKING_ADVANCE; // ₹99
 
-    // 8. Create Razorpay Order on Server
+    // 10. Create Razorpay Order on Server
     const razorpayOrderResult = await createRazorpayOrder({
       bookingCode,
       orderAmount: amount,
@@ -162,6 +169,7 @@ export async function POST(request) {
       bookingCode,
       razorpayOrderId: razorpayOrderResult.orderId,
       amountPaise: razorpayOrderResult.amount,
+      phone: cleanedPhone,
     });
 
     return NextResponse.json({

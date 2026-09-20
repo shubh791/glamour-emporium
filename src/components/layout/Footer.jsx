@@ -203,7 +203,7 @@ export default function Footer() {
             <span className="text-[#c9a87c]">PANIPAT, HARYANA</span>
             <span className="text-white/20">•</span>
             <a
-              href="/#hero"
+              href="#hero"
               className="text-white/60 hover:text-white transition-colors inline-flex items-center gap-1"
             >
               <span>BACK TO TOP</span>
