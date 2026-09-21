@@ -92,9 +92,9 @@ const experienceSteps = [
     description:
       "Our team works with your preferences to create a look suited to you using quality hair and skin products with dedicated attention.",
     image: {
-      src: "/images/salon-detail.jpg",
+      src: "/images/experience/02-create-craft.jpg",
       alt: "Professional hairstylist cutting and styling hair at Glamour Emporium in Panipat",
-      position: "50% 50%",
+      position: "50% 25%",
       label: "02 / CREATION",
     },
     whatsappMessage:
@@ -126,10 +126,10 @@ const experienceSteps = [
     description:
       "Get simple guidance to help maintain your look after your visit, with advice on home styling and care tailored to your hair or skin.",
     image: {
-      src: "/images/editorial-woman.jpg",
-      alt: "Client with finished salon haircut and styling at Glamour Emporium in Panipat",
-      position: "50% 30%",
-      label: "04 / FINISHING",
+      src: "/images/experience/04-keep-maintenance.jpg",
+      alt: "Stylist discussing aftercare hair products with client at Glamour Emporium in Panipat",
+      position: "50% 25%",
+      label: "04 / MAINTENANCE",
     },
     whatsappMessage:
       "Hi Glamour Emporium, I would like to book a complete styling and finishing appointment.",

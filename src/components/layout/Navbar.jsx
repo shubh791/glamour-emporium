@@ -178,113 +178,160 @@ export default function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.28 }}
-            className="fixed inset-0 z-40 bg-[#0c0b0a] text-[#f5f2eb] flex flex-col justify-between p-5 pt-20 sm:p-8 lg:hidden overflow-y-auto max-h-[100dvh]"
-            style={{
-              paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
-            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile Navigation Menu"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="fixed inset-0 z-50 bg-[#0c0b0a] text-[#f5f2eb] flex flex-col lg:hidden h-[100dvh] max-h-[100dvh]"
           >
-            <div className="flex flex-col gap-4 sm:gap-6 mt-1">
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <span className="text-[10px] tracking-[0.3em] uppercase text-[#c9a87c] font-medium">
-                  CAMPAIGN NAVIGATION
-                </span>
-                <span className="font-mono text-[9px] tracking-widest text-white/40">
-                  UNISEX SALON
-                </span>
-              </div>
+            {/* Top Fixed/Sticky Drawer Bar with Brand & Clear Close (X) Button */}
+            <div className="sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6 py-3 bg-[#090909]/95 backdrop-blur-md border-b border-[#c9a87c]/20 shrink-0">
+              <Link
+                href="/"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Glamour Emporium Home"
+                className="flex items-center gap-2.5 min-w-0"
+              >
+                <div className="relative w-8 h-8 rounded-full overflow-hidden border border-[#c9a87c]/60 shrink-0">
+                  <Image
+                    src="/images/logo/logo-mark.webp"
+                    alt="Glamour Emporium Logo"
+                    fill
+                    sizes="32px"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex flex-col justify-center min-w-0">
+                  <span className="font-serif text-[13px] sm:text-[14px] font-normal tracking-[0.14em] text-[#f5f2eb] uppercase leading-tight truncate">
+                    GLAMOUR EMPORIUM
+                  </span>
+                  <span className="font-sans font-medium text-[7px] sm:text-[7.5px] tracking-[0.24em] uppercase text-[#c9a87c] leading-none mt-0.5">
+                    UNISEX SALON • PANIPAT
+                  </span>
+                </div>
+              </Link>
 
-              {/* Navigation Links */}
-              <nav className="flex flex-col gap-1 sm:gap-2" aria-label="Mobile Navigation">
-                {navLinks.map((link, idx) => (
-                  <motion.a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    initial={prefersReducedMotion ? false : { x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.04 * idx, duration: 0.35 }}
-                    className="flex items-baseline justify-between py-2 sm:py-2.5 border-b border-white/10 text-xl sm:text-2xl font-serif font-light tracking-tight text-[#f5f2eb] hover:text-[#c9a87c] transition-colors min-h-[44px]"
-                  >
-                    <span>{link.label}</span>
-                    <span className="font-mono text-xs text-[#c9a87c] tracking-widest">
-                      {link.number}
-                    </span>
-                  </motion.a>
-                ))}
-              </nav>
+              {/* High-visibility Close (X) button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] text-[#f5f2eb] bg-white/[0.06] hover:bg-[#c9a87c]/20 border border-[#c9a87c]/40 hover:border-[#c9a87c] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a87c] cursor-pointer shrink-0 rounded-sm shadow-sm"
+                aria-label="Close navigation menu"
+              >
+                <X className="w-5 h-5 text-[#f5f2eb]" />
+              </button>
+            </div>
 
-              {/* Compact Promotional Offer Card at Bottom of Nav Links */}
-              <BookingPromoMobileDrawer
-                onSelectOffer={() => {
-                  setMobileMenuOpen(false);
-                  openBooking();
-                }}
-              />
+            {/* Scrollable Menu Body */}
+            <div
+              className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 flex flex-col justify-between"
+              style={{
+                paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
+              }}
+            >
+              <div className="flex flex-col gap-4 sm:gap-5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <span className="text-[10px] tracking-[0.28em] uppercase text-[#c9a87c] font-medium font-mono">
+                    CAMPAIGN NAVIGATION
+                  </span>
+                  <span className="font-mono text-[9px] tracking-widest text-white/40 uppercase">
+                    MOMENTS & SERVICES
+                  </span>
+                </div>
 
-              {/* Primary Booking CTA inside Drawer */}
-              <div className="pt-1 flex flex-col gap-2.5 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
+                {/* Navigation Links */}
+                <nav className="flex flex-col gap-1" aria-label="Mobile Navigation">
+                  {navLinks.map((link, idx) => (
+                    <motion.a
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      initial={prefersReducedMotion ? false : { x: -16, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ delay: 0.03 * idx, duration: 0.25 }}
+                      className="flex items-baseline justify-between py-2 sm:py-2.5 border-b border-white/10 text-xl sm:text-2xl font-serif font-light tracking-tight text-[#f5f2eb] hover:text-[#c9a87c] active:text-[#c9a87c] transition-colors min-h-[44px]"
+                    >
+                      <span>{link.label}</span>
+                      <span className="font-mono text-xs text-[#c9a87c] tracking-widest">
+                        {link.number}
+                      </span>
+                    </motion.a>
+                  ))}
+                </nav>
+
+                {/* Compact Promotional Offer Card at Bottom of Nav Links */}
+                <BookingPromoMobileDrawer
+                  onSelectOffer={() => {
                     setMobileMenuOpen(false);
                     openBooking();
                   }}
-                  className="flex items-center justify-between w-full p-3.5 sm:p-4 bg-[#f5f2eb] text-[#0c0b0a] font-bold text-xs tracking-[0.2em] uppercase hover:bg-[#c9a87c] transition-colors min-h-[48px] shadow-[0_4px_20px_rgba(245,242,235,0.12)] cursor-pointer"
-                  style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <CalendarDays className="w-4 h-4 text-[#0c0b0a]/80" />
-                    <span>BOOK A SLOT</span>
-                  </span>
-                  <ArrowUpRight className="w-4 h-4" />
-                </button>
+                />
 
-                {/* Find Booking Quick Link */}
-                <a
-                  href="/find-booking"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-between w-full p-3 sm:p-3.5 border border-[#c9a87c]/30 bg-white/[0.02] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[44px]"
-                >
-                  <span className="flex items-center gap-2 text-[#c9a87c]">
-                    <span>✦</span>
-                    <span>FIND MY BOOKING / RECEIPT</span>
-                  </span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#c9a87c]" />
-                </a>
+                {/* Primary Booking CTA inside Drawer */}
+                <div className="pt-1 flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openBooking();
+                    }}
+                    className="flex items-center justify-between w-full p-3.5 sm:p-4 bg-[#f5f2eb] text-[#0c0b0a] font-bold text-xs tracking-[0.2em] uppercase hover:bg-[#c9a87c] transition-colors min-h-[48px] shadow-[0_4px_20px_rgba(245,242,235,0.12)] cursor-pointer"
+                    style={{ color: "#0c0b0a", backgroundColor: "#f5f2eb" }}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <CalendarDays className="w-4 h-4 text-[#0c0b0a]/80" />
+                      <span>BOOK A SLOT</span>
+                    </span>
+                    <ArrowUpRight className="w-4 h-4" />
+                  </button>
 
-                {/* Instagram Quick Link */}
-                <a
-                  href={siteData.business.social.instagram.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between w-full p-3 sm:p-3.5 border border-white/15 bg-white/[0.03] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[44px]"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <InstagramIcon className="w-4 h-4 text-[#E1306C]" color="#E1306C" />
-                    <span>@{siteData.business.social.instagram.handle}</span>
-                  </span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-white/50" />
-                </a>
-              </div>
-            </div>
+                  {/* Find Booking Quick Link */}
+                  <a
+                    href="/find-booking"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between w-full p-3 sm:p-3.5 border border-[#c9a87c]/30 bg-white/[0.02] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[44px]"
+                  >
+                    <span className="flex items-center gap-2 text-[#c9a87c]">
+                      <span>✦</span>
+                      <span>FIND MY BOOKING / RECEIPT</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#c9a87c]" />
+                  </a>
 
-            {/* Mobile Footer Information */}
-            <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-1.5 text-xs text-white/60 font-sans">
-              <div className="text-[#f5f2eb] font-medium text-xs sm:text-sm flex items-center justify-between">
-                <span>{siteData.business.name}</span>
-                <span className="text-[9px] font-mono text-[#c9a87c] tracking-widest uppercase">
-                  PANIPAT, HARYANA
-                </span>
+                  {/* Instagram Quick Link */}
+                  <a
+                    href={siteData.business.social.instagram.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between w-full p-3 sm:p-3.5 border border-white/15 bg-white/[0.03] text-[#f5f2eb] text-xs font-mono uppercase tracking-[0.16em] hover:border-[#c9a87c] transition-colors min-h-[44px]"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <InstagramIcon className="w-4 h-4 text-[#E1306C]" color="#E1306C" />
+                      <span>@{siteData.business.social.instagram.handle}</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-white/50" />
+                  </a>
+                </div>
               </div>
-              <div className="text-[10.5px] sm:text-[11px] leading-relaxed text-[#eae6df]/80">
-                {siteData.business.address.fullAddress}
-              </div>
-              <div className="text-[#c9a87c] text-[10.5px] sm:text-[11px] mt-0.5 font-mono">
-                {siteData.business.contact.phoneDisplay}
+
+              {/* Mobile Footer Information */}
+              <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-1.5 text-xs text-white/60 font-sans">
+                <div className="text-[#f5f2eb] font-medium text-xs sm:text-sm flex items-center justify-between">
+                  <span>{siteData.business.name}</span>
+                  <span className="text-[9px] font-mono text-[#c9a87c] tracking-widest uppercase">
+                    PANIPAT, HARYANA
+                  </span>
+                </div>
+                <div className="text-[10.5px] sm:text-[11px] leading-relaxed text-[#eae6df]/80">
+                  {siteData.business.address.fullAddress}
+                </div>
+                <div className="text-[#c9a87c] text-[10.5px] sm:text-[11px] mt-0.5 font-mono">
+                  {siteData.business.contact.phoneDisplay}
+                </div>
               </div>
             </div>
           </motion.div>
