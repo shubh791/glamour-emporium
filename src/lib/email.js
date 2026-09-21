@@ -2,51 +2,79 @@ import { Resend } from "resend";
 import prisma from "@/lib/prisma";
 import { formatDisplayDate, BOOKING_ADVANCE } from "@/data/bookingConfig";
 
-const SALON_OWNER_EMAIL = process.env.SALON_OWNER_EMAIL || "salmasaifi0888@gmail.com";
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Glamour Emporium <onboarding@resend.dev>";
-const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || "";
+/**
+ * Returns active Resend configuration from environment variables dynamically
+ */
+export function getEmailConfig() {
+  const apiKey = process.env.RESEND_API_KEY?.trim() || "";
+  const fromEmail =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "Glamour Emporium <bookings@glamouremporiumsaloon.com>";
+  const ownerEmail =
+    process.env.SALON_OWNER_EMAIL?.trim() || "salmasaifi0888@gmail.com";
 
-let resendClient = null;
-if (RESEND_API_KEY && !RESEND_API_KEY.includes("placeholder") && !RESEND_API_KEY.includes("xxxx")) {
+  const isConfigured =
+    Boolean(apiKey) &&
+    !apiKey.includes("placeholder") &&
+    !apiKey.includes("xxxx");
+
+  return {
+    apiKey,
+    fromEmail,
+    ownerEmail,
+    isConfigured,
+  };
+}
+
+/**
+ * Instantiates or returns active Resend client
+ */
+export function getResendClient() {
+  const { apiKey, isConfigured } = getEmailConfig();
+  if (!isConfigured) return null;
   try {
-    resendClient = new Resend(RESEND_API_KEY);
+    return new Resend(apiKey);
   } catch (err) {
     console.warn("[Email Service] Failed to initialize Resend client:", err.message);
+    return null;
   }
 }
 
 /**
- * Sends an official booking confirmation email to the salon owner with deduplication.
+ * Sends an official booking confirmation email to the salon owner with robust deduplication.
  * @param {Object} booking - Booking object from database
- * @returns {Promise<{success: boolean, skipped?: boolean, error?: string, messageId?: string}>}
+ * @param {Object} [options] - Optional flags (e.g. force: true for one-time replay)
+ * @returns {Promise<{success: boolean, skipped?: boolean, error?: string, messageId?: string, sentAt?: Date}>}
  */
-export async function sendOwnerBookingNotification(booking) {
+export async function sendOwnerBookingNotification(booking, options = {}) {
+  const { force = false } = options;
   if (!booking || !booking.id) {
     return { success: false, error: "Invalid booking data" };
   }
 
-  try {
-    // 1. Atomically attempt to set ownerNotifiedAt to prevent duplicate emails across verify and webhook
-    const updated = await prisma.booking.updateMany({
-      where: {
-        id: booking.id,
-        ownerNotifiedAt: null,
-      },
-      data: {
-        ownerNotifiedAt: new Date(),
-      },
-    });
+  const { fromEmail, ownerEmail, isConfigured } = getEmailConfig();
 
-    // If 0 rows were updated, this booking was already notified
-    if (updated.count === 0 && booking.ownerNotifiedAt) {
-      console.log(`[Email Service] Notification for booking ${booking.bookingCode} was already sent. Skipping duplicate.`);
-      return { success: true, skipped: true };
+  try {
+    // 1. Check if already notified in database (unless force replay requested)
+    if (!force) {
+      const fresh = await prisma.booking.findUnique({
+        where: { id: booking.id },
+        select: { ownerNotifiedAt: true, bookingCode: true },
+      });
+
+      if (fresh?.ownerNotifiedAt) {
+        console.log(
+          `[Email Service] Notification for booking ${fresh.bookingCode} was already sent at ${fresh.ownerNotifiedAt.toISOString()}. Skipping duplicate.`
+        );
+        return { success: true, skipped: true };
+      }
     }
 
-    if (!resendClient) {
+    const resendClient = getResendClient();
+    if (!resendClient || !isConfigured) {
       console.log("[Email Service] Resend API key not configured or in placeholder mode. Logged notification payload:", {
         bookingCode: booking.bookingCode,
-        recipient: SALON_OWNER_EMAIL,
+        recipient: ownerEmail,
         customerName: booking.customerName,
         phone: booking.phone,
         date: booking.bookingDate,
@@ -178,20 +206,36 @@ Operating Brand: Glamour Emporium Unisex Salon (SS Enterprises)
 `;
 
     const { data, error } = await resendClient.emails.send({
-      from: RESEND_FROM_EMAIL,
-      to: [SALON_OWNER_EMAIL],
+      from: fromEmail,
+      to: [ownerEmail],
       subject: emailSubject,
       text: textContent,
       html: htmlContent,
     });
 
-    if (error) {
-      console.error("[Email Service] Resend API error:", error);
-      return { success: false, error: error.message };
+    if (error || !data?.id) {
+      const errMsg = error?.message || "Unknown error occurred while sending confirmation email.";
+      console.error("[Email Service] Resend API error:", {
+        message: errMsg,
+        name: error?.name,
+        statusCode: error?.statusCode,
+        bookingCode: booking.bookingCode,
+      });
+      // Do not mark as notified so future retries or webhooks can deliver the email
+      return { success: false, error: errMsg };
     }
 
-    console.log(`[Email Service] Confirmation email sent successfully for ${booking.bookingCode}. Message ID: ${data?.id}`);
-    return { success: true, messageId: data?.id };
+    // 3. Mark ownerNotifiedAt in database ONLY after verified successful dispatch
+    const sentAt = new Date();
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        ownerNotifiedAt: sentAt,
+      },
+    });
+
+    console.log(`[Email Service] Confirmation email sent successfully for ${booking.bookingCode}. Resend Message ID: ${data.id}`);
+    return { success: true, messageId: data.id, sentAt };
   } catch (err) {
     console.error("[Email Service] Unexpected error sending email:", err.message);
     // Crucial: Email failure must never break payment confirmation
