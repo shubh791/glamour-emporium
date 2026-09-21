@@ -5,8 +5,8 @@
  * notification recipients, contact email, and structured WhatsApp message builders.
  */
 
-// ₹1 appointment advance (temporary live payment test) — fully adjusted against final salon bill
-export const BOOKING_ADVANCE = 1;
+// ₹99 appointment advance — fully adjusted against final salon bill
+export const BOOKING_ADVANCE = 99;
 
 // Closed days: Glamour Emporium is closed every Tuesday (Day 2 in JavaScript Date.getDay())
 export const SALON_CLOSED_DAYS = [2];
